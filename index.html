@@ -5,9 +5,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Weather Widget</title>
 <!-- nur Demo-Seite, gehört nicht ins Webflow-Embed -->
-<style>body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fff; }</style>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); /* sonst weitet der Slider die Seite */ background: #fff; color: #0b1f4b; font-family: system-ui, sans-serif; }
+  .tabs { display: flex; justify-content: center; gap: 8px; padding: 16px; }
+  .tabs a { padding: 8px 18px; border-radius: 999px; color: inherit; text-decoration: none; font-weight: 600; font-size: 15px; }
+  .tabs a[aria-current="page"] { background: #0b1f4b; color: #fff; }
+  .tabs a:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 2px; }
+  .stage { display: flex; align-items: center; justify-content: center; width: min(100% - 32px, 1400px); margin: 0 auto; }
+  .holes, .hole-nav, .dots { display: none; }
+  /* Platzansicht: Slider Bahn 1–9 (Bahn-Infos | Grafik mittig), Wetter fest oben rechts neben der Grafik */
+  body.view-platz .stage { --img-h: min(calc(100vh - 194px), 820px); display: block; position: relative; }
+  body.view-platz .holes { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; }
+  .holes::-webkit-scrollbar { display: none; }
+  .holes:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 4px; }
+  .slide { flex: 0 0 100%; scroll-snap-align: start; display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: center; }
+  .hole-img { height: var(--img-h); width: auto; max-width: 100%; }
+  body.view-platz #weather-widget { position: absolute; top: 0; height: var(--img-h); display: flex; align-items: center; left: calc(50% + var(--img-h) * .4 + 32px); } /* .4 = halbe Bildbreite (896/1122 / 2) */
+  /* 3D-Ansicht liegt über der Grafik der aktiven Bahn; 20 % größer, damit beim Drehen nichts abgeschnitten wird */
+  .hole-3d { display: none; }
+  body.view-platz .hole-3d { display: block; position: absolute; top: calc(var(--img-h) * -.1); left: 50%; width: calc(var(--img-h) * .7986 * 1.2); height: calc(var(--img-h) * 1.2); margin-left: calc(var(--img-h) * .7986 * -.6); pointer-events: none; opacity: 0; }
+  body.view-platz .stage:not(.img-ready) #weather-widget { visibility: hidden; } /* Wetter erst zeigen, wenn die Bahn-Grafik geladen ist */
+  body.view-platz #weather-widget .ww-col:first-child { display: none; } /* Platzstatus hier ausgeblendet */
+  body.view-platz .hole-nav { display: grid; place-items: center; position: absolute; top: calc(var(--img-h) / 2); transform: translateY(-50%); width: 44px; height: 44px; border: 2px solid #0b1f4b; border-radius: 50%; background: #fff; color: #0b1f4b; font-size: 26px; line-height: 1; cursor: pointer; }
+  .hole-nav.prev { left: 0; } .hole-nav.next { right: 0; }
+  .hole-nav:disabled { opacity: .25; cursor: default; }
+  body.view-platz .dots { display: flex; justify-content: center; gap: 0; margin-top: 36px; }
+  /* Dots: 16px Klickfläche, sichtbar ein 8px-Punkt; inaktiv blass, aktiv voll */
+  .dots button { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+  .dots button::before { content: ""; display: block; width: 8px; height: 8px; margin: auto; border-radius: 50%; background: #0b1f4b; opacity: .2; transition: opacity .3s; }
+  .dots button[aria-current="true"]::before { opacity: 1; }
+  .hole-nav:focus-visible, .dots button:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 2px; }
+  .hole { justify-self: end; align-self: center; text-align: center; color: #0b1f4b; }
+  .hole-nr { font-size: 56px; font-weight: 800; line-height: 1.1; padding-bottom: 12px; border-bottom: 2px solid currentColor; margin-bottom: 12px; }
+  .hole-meta { font-size: 28px; font-weight: 700; line-height: 1.3; }
+  .hole-name { display: inline-block; margin-top: 16px; padding: 4px 14px; border: 2px solid currentColor; border-radius: 999px; font-size: 16px; font-weight: 600; }
+  /* Einblenden beim Wechsel zur Platzansicht: Bahn (Modell), dann Bahn-Angaben links, dann Wetter rechts.
+     "backwards" statt "both": nach der Animation gelten wieder die Inline-Opacities des Sliders */
+  @keyframes pv-in { from { opacity: 0; transform: translateY(16px); } }
+  @keyframes pv-model { from { opacity: 0; transform: scale(.96); } }
+  body.view-platz .hole > * { animation: pv-in .6s cubic-bezier(.2,.7,.2,1) .5s backwards; } /* Titel, PAR, HCP, Name nacheinander */
+  body.view-platz .hole > :nth-child(2) { animation-delay: .62s; }
+  body.view-platz .hole > :nth-child(3) { animation-delay: .74s; }
+  body.view-platz .hole > :nth-child(4) { animation-delay: .86s; }
+  body.view-platz .hole-img, body.view-platz .hole-3d { animation: pv-model .8s cubic-bezier(.2,.7,.2,1) backwards; }
+  body.view-platz #weather-widget { --ww-base: 1.2s; }
+  @keyframes pv-fade { from { opacity: 0; } } /* nur Opacity: die Pfeile nutzen transform zur Zentrierung */
+  body.view-platz .hole-nav, body.view-platz .dots { animation: pv-fade .6s ease 2.6s backwards; } /* Slider-Steuerung zuletzt, nach den Wetterdaten */
+  @media (prefers-reduced-motion: reduce) { body.view-platz .hole > *, body.view-platz .hole-img, body.view-platz .hole-3d, body.view-platz .hole-nav, body.view-platz .dots { animation: none; } }
+  .demo-ctrl { position: fixed; left: 16px; bottom: 12px; display: flex; gap: 16px; }
+  .demo-ctrl button { padding: 0; border: 0; background: none; color: #0b1f4b; font: 500 13px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .demo-ctrl button:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 2px; }
+  /* Tab 3D-Ansicht: echtes 3D-Modell der Bahn */
+  .model3d { display: none; }
+  body.view-3d .model3d { display: block; position: fixed; inset: 70px 0 40px; }
+  body.view-3d #weather-widget { position: fixed; top: 0; bottom: 0; right: 32px; display: flex; align-items: center; pointer-events: none; z-index: 1; }
+  body.view-3d #weather-widget .ww-col:first-child { display: none; } /* Platzstatus hier ausgeblendet */
+  .model3d canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .model3d canvas:active { cursor: grabbing; }
+  .model3d-hint { position: absolute; left: 0; right: 0; bottom: -28px; /* unter der Canvas, auf Höhe der Demo-Links */ margin: 0; text-align: center; font-size: 13px; opacity: .6; }
+  /* Kompass im Stil der Wetterdaten (Variante .ww-stack): Icon links, Wert fett, Subline darunter */
+  .compass { position: absolute; top: 16px; right: 32px; display: grid; grid-template-columns: 56px auto; column-gap: 16px; align-items: center; color: #0b1f4b; font-variant-numeric: tabular-nums; }
+  .compass-icon { grid-row: span 2; width: 56px; height: 56px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+  .compass-value { align-self: end; min-width: 4.5em; font-size: 28px; font-weight: 800; line-height: 1.15; }
+  .compass-label { align-self: start; font-size: 15px; line-height: 1.4; }
+  #wind-bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  body:not(.view-platz) #wind-bg { display: none; }
+</style>
 </head>
 <body>
+<canvas id="wind-bg" aria-hidden="true"></canvas>
+<nav class="tabs" aria-label="Ansicht">
+  <a href="#">Übersicht</a>
+  <a href="#platz">Tiefenansicht</a>
+  <a href="#3d">3D-Ansicht</a>
+</nav>
+<main class="stage">
+<div class="holes" id="holes" tabindex="0" aria-label="Bahnen 1 bis 9">
+<section class="slide" aria-label="Bahn 1">
+<div class="hole">
+  <div class="hole-nr">Bahn 1</div>
+  <div class="hole-meta">PAR 4</div>
+  <div class="hole-meta">HCP 3/4</div>
+  <div class="hole-name">Achtern Diek</div>
+</div>
+<img class="hole-img" src="https://static.wixstatic.com/media/e2e33d_b3aa1c2913e8482aa0509369f674eea9~mv2.png/v1/crop/x_31,y_0,w_1199,h_1500/fill/w_896,h_1122,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/3d-perspektive-lc.png" alt="3D-Ansicht von Bahn 1, Achtern Diek">
+</section>
+</div>
+<button class="hole-nav prev" type="button" aria-label="Vorherige Bahn">‹</button>
+<button class="hole-nav next" type="button" aria-label="Nächste Bahn">›</button>
+<div class="dots" id="dots"></div>
 <!-- Webflow: alles zwischen START und END in ein Embed-Element kopieren -->
 <!-- START weather-widget -->
 <div id="weather-widget">
@@ -51,11 +137,19 @@
   #weather-widget .ww-d > span { display: block; transition: transform .9s cubic-bezier(.2,.7,.2,1); }
   /* Intro: Icon, Hauptwert, Subline gleiten nacheinander hoch; Spalten leicht versetzt */
   @keyframes ww-up { from { opacity: 0; transform: translateY(16px); } }
-  #weather-widget .ww-col > * { animation: ww-up .6s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--ww-c, 0s); }
+  #weather-widget .ww-col > * { animation: ww-up .6s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--ww-base, 0s) + var(--ww-c, 0s)); } /* --ww-base: optionaler Start-Versatz von außen */
   #weather-widget .ww-col:nth-child(2) { --ww-c: .2s; }
   #weather-widget .ww-col:nth-child(3) { --ww-c: .4s; }
-  #weather-widget .ww-col > :nth-child(2) { animation-delay: calc(var(--ww-c, 0s) + .12s); }
-  #weather-widget .ww-col > :nth-child(3) { animation-delay: calc(var(--ww-c, 0s) + .24s); }
+  #weather-widget .ww-col > :nth-child(2) { animation-delay: calc(var(--ww-base, 0s) + var(--ww-c, 0s) + .12s); }
+  #weather-widget .ww-col > :nth-child(3) { animation-delay: calc(var(--ww-base, 0s) + var(--ww-c, 0s) + .24s); }
+  /* Variante .ww-stack: Werte untereinander, Icon links neben Wert + Subline */
+  #weather-widget.ww-stack { width: auto; }
+  #weather-widget.ww-stack .ww-card { grid-template-columns: auto; gap: 24px; padding: 0; text-align: left; }
+  #weather-widget.ww-stack .ww-col { display: grid; grid-template-columns: 56px auto; column-gap: 16px; align-items: center; }
+  #weather-widget.ww-stack .ww-icon { grid-row: span 2; width: 56px; height: 56px; }
+  #weather-widget.ww-stack .ww-value { margin-top: 0; align-self: end; font-size: 28px; }
+  #weather-widget.ww-stack .ww-label { align-self: start; font-size: 15px; }
+  #weather-widget.ww-stack .ww-value:empty::before, #weather-widget.ww-stack .ww-label:empty::before { margin-left: 0; }
   @media (prefers-reduced-motion: reduce) { #weather-widget .ww-d > span { transition: none; } #weather-widget .ww-col > * { animation: none; } }
 </style>
 <script>
@@ -136,6 +230,28 @@
     return fetch(url).then(function (r) { return r.json(); }).catch(function () { return null; });
   };
 
+  // Werte anzeigen; v = { temp °C, speed m/s, dir Grad (woher), code WMO, isDay }
+  function render(v) {
+    if (v.code != null) {
+      var w = weather(v.code, v.isDay);
+      $('ww-weather-icon').innerHTML = ICONS[w[0]];
+      $('ww-desc').textContent = w[1];
+    }
+    odo($('ww-temp'), v.temp == null ? '–' : (Math.round(v.temp) || 0) + ' °C'); // || 0 vermeidet "-0"
+    odo($('ww-wind'), v.speed == null ? '–' : v.speed.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m/s');
+    $('ww-dir').textContent = v.dir == null ? 'Wind' : 'aus ' + DIRS[Math.round(v.dir / 45) % 8];
+    // für optionale Effekte außerhalb des Widgets (z. B. Windlinien); Richtung = angezeigter Sektor
+    // weatherWidget.wind hält den letzten Wert für Skripte, die erst nach dem Event laden
+    if (v.dir != null) $('weather-widget').dispatchEvent(new CustomEvent('ww:wind', { bubbles: true, detail: weatherWidget.wind = { dir: Math.round(v.dir / 45) % 8 * 45, speed: v.speed } }));
+  }
+
+  // real = zuletzt geladene Wetterdaten; override = von außen gesetzte Werte (Demo), solange aktiv kein Überschreiben durch Refresh
+  var real = null, override = null;
+  window.weatherWidget = {
+    show: function (v) { override = v; render(v); },
+    reset: function () { override = null; if (real) render(real); }
+  };
+
   function load() {
     Promise.all([getJson(MODEL_URL), getJson(STATION_URL)]).then(function (res) {
       var m = res[0] && res[0].current, s = res[1] && res[1].weather;
@@ -147,18 +263,13 @@
       }
       m = m || {}; s = s || {};
 
-      var temp = avg([m.temperature_2m, s.temperature]);
-      var speed = avg([m.wind_speed_10m, s.wind_speed_10 == null ? null : s.wind_speed_10 / 3.6]); // Bright Sky liefert km/h
-      var dir = avgDir([m.wind_direction_10m, s.wind_direction_10]);
-
-      if (m.weather_code != null) {
-        var w = weather(m.weather_code, m.is_day);
-        $('ww-weather-icon').innerHTML = ICONS[w[0]];
-        $('ww-desc').textContent = w[1];
-      }
-      odo($('ww-temp'), temp == null ? '–' : (Math.round(temp) || 0) + ' °C'); // || 0 vermeidet "-0"
-      odo($('ww-wind'), speed == null ? '–' : speed.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m/s');
-      $('ww-dir').textContent = dir == null ? 'Wind' : 'aus ' + DIRS[Math.round(dir / 45) % 8];
+      real = {
+        temp: avg([m.temperature_2m, s.temperature]),
+        speed: avg([m.wind_speed_10m, s.wind_speed_10 == null ? null : s.wind_speed_10 / 3.6]), // Bright Sky liefert km/h
+        dir: avgDir([m.wind_direction_10m, s.wind_direction_10]),
+        code: m.weather_code, isDay: m.is_day
+      };
+      if (!override) render(real);
       $('ww-foot').textContent = 'Modell: Schloss Breitenburg · Messung: DWD Itzehoe' + (s.timestamp
         ? ', ' + new Date(s.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr' : '');
     });
@@ -170,5 +281,388 @@
 })();
 </script>
 <!-- END weather-widget -->
+</main>
+<div class="model3d" id="model3d">
+  <canvas aria-label="3D-Modell von Bahn 1, Achtern Diek" role="img"></canvas>
+  <p class="model3d-hint">Ziehen zum Drehen · Scrollen zum Zoomen</p>
+  <div class="compass">
+    <svg class="compass-icon" viewBox="0 0 24 24" aria-hidden="true"><g id="compass-rose"><circle cx="12" cy="12" r="10"/><path d="M12 4.5l2.4 7.5h-4.8z" fill="currentColor"/><path d="M12 19.5l2.4-7.5h-4.8z"/></g></svg>
+    <div class="compass-value" id="compass-dir">N 0°</div>
+    <div class="compass-label" id="compass-tilt">Neigung 0°</div>
+  </div>
+</div>
+<div class="demo-ctrl">
+  <button type="button" id="randomize">Zufallswerte</button>
+  <button type="button" id="reset">Zurücksetzen</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// Demo-Seite: Tabs per Hash; Platzansicht = Bahn-Infos, Grafik, Widget-Variante .ww-stack
+(function () {
+  var widget = document.getElementById('weather-widget');
+  function route() {
+    var platz = location.hash === '#platz', three = location.hash === '#3d';
+    document.body.classList.toggle('view-platz', platz);
+    document.body.classList.toggle('view-3d', three);
+    widget.classList.toggle('ww-stack', platz || three);
+    document.querySelectorAll('.tabs a').forEach(function (a) {
+      var href = a.getAttribute('href'), on = platz ? href === '#platz' : three ? href === '#3d' : href === '#';
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    var replay = function () { // Intro-Animation erneut abspielen
+      document.getAnimations().forEach(function (a) { if (a.animationName === 'ww-up') { a.currentTime = 0; a.play(); } });
+    };
+    var stage = document.querySelector('.stage'), img = stage.querySelector('.hole-img');
+    stage.classList.remove('img-ready');
+    if (!platz) return replay();
+    // decode() wartet, bis die Grafik geladen und darstellbar ist; bei Ladefehler Wetter trotzdem zeigen
+    img.decode().catch(function () {}).then(function () { stage.classList.add('img-ready'); replay(); });
+  }
+  addEventListener('hashchange', route);
+  route();
+})();
+
+// 3D-Ansicht: Modell aus 3d/ (erzeugt mit model3d.py aus der Illustration): Gelände mit Höhen, Erdsockel,
+// Wasser, Bäume, Hütte, Fahne. Wird erst beim ersten Öffnen des Tabs gebaut.
+(function () {
+  var box = document.getElementById('model3d'), canvas = box.querySelector('canvas'), started = false;
+  function init() {
+    if (started || !window.THREE || !THREE.OrbitControls) return;
+    started = true;
+    var STRETCH = 1.15; // Illustration ist schräg von oben gezeichnet: Tiefe etwas strecken
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    var controls = new THREE.OrbitControls(camera, canvas);
+    controls.enableDamping = true; controls.enablePan = false;
+    controls.minDistance = 5; controls.maxDistance = 28;
+    controls.minPolarAngle = 0.15; controls.maxPolarAngle = 1.3; // nicht unter den Boden
+    controls.autoRotateSpeed = 0.4;
+    var touched = false;
+    controls.addEventListener('start', function () { touched = true; controls.autoRotate = false; });
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x4a5a3a, 0.55));
+    var sun = new THREE.DirectionalLight(0xffffff, 0.85);
+    sun.position.set(-6, 12, 5); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 9, bottom: -9, near: 1, far: 40 });
+    sun.shadow.normalBias = 0.02;
+    scene.add(sun);
+
+    var C = function (hex) { return new THREE.Color(hex).convertSRGBToLinear(); }; // Farben wie im Bild (sRGB) angeben
+    var tex = new THREE.TextureLoader();
+    var load = function (url, srgb) {
+      var t = tex.load(url); if (srgb) t.encoding = THREE.sRGBEncoding;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
+    };
+    Promise.all([
+      fetch('3d/hole.json').then(function (r) { return r.json(); }),
+      new Promise(function (ok) { var i = new Image(); i.onload = function () { ok(i); }; i.src = '3d/height.png'; })
+    ]).then(function (res) {
+      var d = res[0], hImg = res[1];
+      var W = 10, D = W * d.h / d.w * STRETCH, DISP = 0.35; // Wasser liegt damit knapp über der Sockelunterkante
+      var X = function (u) { return (u - 0.5) * W; }, Z = function (v) { return (v - 0.5) * D; };
+      // Geländehöhe an (u, v) aus height.png, gleiche Formel wie die Displacement-Map unten
+      var c2 = document.createElement('canvas'); c2.width = hImg.width; c2.height = hImg.height;
+      var cx = c2.getContext('2d'); cx.drawImage(hImg, 0, 0);
+      var hd = cx.getImageData(0, 0, hImg.width, hImg.height).data;
+      var Y = function (u, v) {
+        var px = Math.min(hImg.width - 1, Math.max(0, Math.round(u * hImg.width)));
+        var py = Math.min(hImg.height - 1, Math.max(0, Math.round(v * hImg.height)));
+        return (hd[(py * hImg.width + px) * 4] / 255 - 0.5) * DISP;
+      };
+
+      // Gelände: fein unterteilte Fläche, Höhe per Displacement, Umriss per Alpha der Textur
+      var gGeo = new THREE.PlaneGeometry(W, D, 300, 430); gGeo.rotateX(-Math.PI / 2);
+      var ground = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({
+        map: load('3d/ground.png', true), displacementMap: load('3d/height.png'),
+        displacementScale: DISP, displacementBias: -DISP / 2, alphaTest: 0.5, roughness: 0.95
+      }));
+      ground.receiveShadow = true; scene.add(ground);
+
+      // Erdsockel: nur die Seitenwände des extrudierten Umrisses (Deckel unsichtbar, sonst verdeckt er Wasser/Bunker)
+      var shape = new THREE.Shape(d.outline.map(function (p) { return new THREE.Vector2(X(p[0]), -Z(p[1])); }));
+      var slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: false }),
+        [new THREE.MeshBasicMaterial({ visible: false }), new THREE.MeshStandardMaterial({ color: C(0x6b4b2e), roughness: 1 })]);
+      slab.rotation.x = -Math.PI / 2; slab.position.y = -0.15; scene.add(slab);
+
+      // Wasser: halbtransparente Fläche knapp unter Normalniveau, Form aus water.png
+      var wGeo = new THREE.PlaneGeometry(W, D); wGeo.rotateX(-Math.PI / 2);
+      var water = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
+        color: C(0x2a7fb8), alphaMap: load('3d/water.png'), transparent: true, opacity: 0.85, roughness: 0.15, metalness: 0.1, depthWrite: false
+      }));
+      water.position.y = -0.04; scene.add(water);
+
+      // Bäume: instanziert (Stamm + Krone), Größe aus der Illustration, Farbe leicht variiert
+      var n = d.trees.length, m4 = new THREE.Matrix4(), col = new THREE.Color(), rnd = function (a, b) { return a + Math.random() * (b - a); };
+      var trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.14, 1, 6), new THREE.MeshStandardMaterial({ color: C(0x5a4030), roughness: 1 }), n);
+      var crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 }), n);
+      d.trees.forEach(function (t, i) {
+        var r = t[2] * W * 1.25, x = X(t[0]), z = Z(t[1]), y = Y(t[0], t[1]), th = r * 0.9;
+        trunks.setMatrixAt(i, m4.compose(new THREE.Vector3(x, y + th / 2, z), new THREE.Quaternion(), new THREE.Vector3(r * 0.5, th, r * 0.5)));
+        var q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rnd(0, 6.3), 0));
+        crowns.setMatrixAt(i, m4.compose(new THREE.Vector3(x, y + th + r * 0.8, z), q, new THREE.Vector3(r, r * rnd(1, 1.3), r)));
+        crowns.setColorAt(i, col.setHSL(rnd(0.22, 0.33), rnd(0.4, 0.6), rnd(0.18, 0.3)).convertSRGBToLinear()); // Farben wie im Bild (sRGB) angeben
+      });
+      [trunks, crowns].forEach(function (o) { o.castShadow = o.receiveShadow = true; scene.add(o); });
+
+      // Hütte (achteckiger Pavillon) und Fahne auf dem Grün
+      var hut = new THREE.Group(), hx = X(d.hut[0]), hz = Z(d.hut[1]), hy = Y(d.hut[0], d.hut[1]);
+      var walls = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.14, 8), new THREE.MeshStandardMaterial({ color: C(0xe8dcc4) }));
+      var roof = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.13, 8), new THREE.MeshStandardMaterial({ color: C(0xa8432a), flatShading: true }));
+      walls.position.y = 0.07; roof.position.y = 0.205; hut.add(walls, roof);
+      hut.children.forEach(function (o) { o.castShadow = o.receiveShadow = true; });
+      hut.position.set(hx, hy, hz); scene.add(hut);
+      var fx = X(d.flag[0]), fz = Z(d.flag[1]), fy = Y(d.flag[0], d.flag[1]);
+      var pin = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.5, 6), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+      pin.position.set(fx, fy + 0.25, fz); pin.castShadow = true;
+      var flagShape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.16, -0.05), new THREE.Vector2(0, -0.1)]);
+      var flag = new THREE.Mesh(new THREE.ShapeGeometry(flagShape), new THREE.MeshStandardMaterial({ color: C(0xd93a2b), side: THREE.DoubleSide }));
+      flag.position.set(fx, fy + 0.5, fz); flag.castShadow = true;
+      scene.add(pin, flag);
+
+      // Startansicht wie die Illustration (Tiefenansicht): von Süden (Abschlag unten) nach Norden, 30° aus der Senkrechten
+      // (Illustration ist in der Tiefe um 1/1.15 gestaucht → Blick ca. 60° über dem Horizont). Nach 2 s langsam drehen.
+      var R = 22, TILT = 30 * Math.PI / 180;
+      controls.target.set(0, 0, 0.6);
+      camera.position.set(0, R * Math.cos(TILT), 0.6 + R * Math.sin(TILT));
+      controls.update();
+      setTimeout(function () { if (!touched) controls.autoRotate = true; }, 2000);
+      box.classList.add('ready');
+    });
+
+    // Wind im Modell: kurze helle Striche, die in Windrichtung über die Bahn ziehen (Weltkoordinaten: Norden = -z, Osten = +x),
+    // dadurch reagieren sie von selbst auf Drehung und Neigung der Kamera
+    // (schmale Quader statt Linien: WebGL zeichnet Linien immer nur 1 px breit)
+    var N = 450, LIFE = 2.5, wv = new THREE.Vector3(), streaks = [];
+    var sMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.03, 0.012, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), N);
+    scene.add(sMesh);
+    var sM = new THREE.Matrix4(), sP = new THREE.Vector3(), sQ = new THREE.Quaternion(), sS = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+    var spawn = function (st) { st.x = (Math.random() - 0.5) * 14; st.z = (Math.random() - 0.5) * 18; st.y = 0.25 + Math.random() * 1.2; st.age = 0; st.life = LIFE * (0.6 + Math.random() * 0.8); return st; };
+    for (var k = 0; k < N; k++) { streaks.push(spawn({})); streaks[k].age = Math.random() * streaks[k].life; }
+    function setWind(w) {
+      var b = (w.dir + 180) * Math.PI / 180; // "aus NO" strömt nach SW
+      var v = 0.4 + Math.min(w.speed || 0, 15) * 0.18;
+      wv.set(Math.sin(b) * v, 0, -Math.cos(b) * v);
+      sQ.setFromAxisAngle(up, Math.atan2(wv.x, wv.z)); // Streifen entlang der Windrichtung ausrichten
+    }
+    if (weatherWidget.wind) setWind(weatherWidget.wind);
+    document.addEventListener('ww:wind', function (e) { setWind(e.detail); });
+    var lastT = performance.now();
+    function wind() {
+      var now = performance.now(), dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+      for (var i = 0; i < N; i++) {
+        var st = streaks[i];
+        st.age += dt; st.x += wv.x * dt; st.z += wv.z * dt;
+        if (st.age > st.life || Math.abs(st.x) > 7 || Math.abs(st.z) > 9) spawn(st);
+        var len = 0.7 * Math.sin(Math.PI * st.age / st.life) * Math.min(1, wv.length()); // wächst beim Entstehen, schrumpft vor dem Verschwinden
+        sP.set(st.x, st.y, st.z); sS.z = Math.max(len, 0.0001);
+        sMesh.setMatrixAt(i, sM.compose(sP, sQ, sS));
+      }
+      sMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    (function frame() {
+      requestAnimationFrame(frame);
+      if (!document.body.classList.contains('view-3d')) return;
+      wind();
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (canvas.width !== Math.round(w * renderer.getPixelRatio()) || canvas.height !== Math.round(h * renderer.getPixelRatio())) {
+        renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+      }
+      controls.update();
+      compass();
+      renderer.render(scene, camera);
+    })();
+
+    // Kompass: Blickrichtung (Himmelsrichtung + Grad) und Neigung (0° = senkrecht von oben)
+    // shortcut: Norden = oben in der Illustration angenommen; echte Ausrichtung der Bahn per NORTH (Grad) korrigieren
+    var NORTH = 0, DIRS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'], last = '', look = new THREE.Vector3();
+    var rose = document.getElementById('compass-rose'), dirEl = document.getElementById('compass-dir'), tiltEl = document.getElementById('compass-tilt');
+    function compass() {
+      if (!look) return; // erster Frame läuft, bevor die Kompass-Variablen gesetzt sind
+      camera.getWorldDirection(look);
+      var hdg = Math.round((Math.atan2(look.x, -look.z) * 180 / Math.PI + NORTH + 360) % 360);
+      var tilt = Math.round(controls.getPolarAngle() * 180 / Math.PI);
+      if (hdg + '/' + tilt === last) return;
+      last = hdg + '/' + tilt;
+      dirEl.textContent = DIRS[Math.round(hdg / 45) % 8] + ' ' + hdg + '°';
+      tiltEl.textContent = 'Neigung ' + tilt + '°';
+      // Nadel zeigt nach Norden; je flacher der Blick, desto stärker wird die Rose gestaucht
+      rose.setAttribute('transform', 'translate(12 12) scale(1 ' + Math.max(0.25, Math.cos(tilt * Math.PI / 180)).toFixed(3) + ') rotate(' + (-hdg) + ') translate(-12 -12)');
+    }
+  }
+  function check() { if (location.hash === '#3d') init(); }
+  addEventListener('hashchange', check);
+  check();
+})();
+
+// Demo: Zufallswerte / zurück auf echte Wetterdaten
+(function () {
+  var CODES = [0, 2, 3, 45, 61, 71, 95]; // klar, teils bewölkt, bewölkt, Nebel, Regen, Schnee, Gewitter
+  var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
+  document.getElementById('randomize').onclick = function () {
+    weatherWidget.show({
+      temp: Math.round(Math.random() * 35 - 5),
+      speed: Math.round(Math.random() * 150) / 10,
+      dir: Math.floor(Math.random() * 360),
+      code: pick(CODES), isDay: Math.random() < .7 ? 1 : 0
+    });
+  };
+  document.getElementById('reset').onclick = function () { weatherWidget.reset(); };
+})();
+
+// Bahn-Slider: Bahn 1 wird für 2–9 dupliziert (shortcut: gleicher Inhalt, später echte Daten je Bahn)
+(function () {
+  var track = document.getElementById('holes'), dots = document.getElementById('dots');
+  var first = track.querySelector('.slide');
+  for (var n = 2; n <= 9; n++) {
+    var s = first.cloneNode(true);
+    s.setAttribute('aria-label', 'Bahn ' + n);
+    s.querySelector('.hole-nr').textContent = 'Bahn ' + n;
+    s.querySelector('.hole-img').alt = '3D-Ansicht von Bahn ' + n;
+    track.appendChild(s);
+  }
+  var slides = track.children, prev = document.querySelector('.hole-nav.prev'), next = document.querySelector('.hole-nav.next');
+  [].forEach.call(slides, function (s, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('aria-label', 'Bahn ' + (i + 1));
+    b.onclick = function () { go(i); };
+    dots.appendChild(b);
+  });
+  var current = function () { return Math.round(track.scrollLeft / track.clientWidth) || 0; };
+  function go(i) { track.scrollTo({ left: i * track.clientWidth }); }
+  var idx = 0;
+  function update() {
+    var i = idx = current();
+    [].forEach.call(dots.children, function (b, j) { b.setAttribute('aria-current', j === i); });
+    prev.disabled = i === 0; next.disabled = i === slides.length - 1;
+  }
+  prev.onclick = function () { go(current() - 1); };
+  next.onclick = function () { go(current() + 1); };
+  track.addEventListener('scroll', update, { passive: true });
+
+  // Wetter-Widget und 3D-Ansicht gibt es nur einmal: beim Wischen mit der Bahn verschieben und dabei ausblenden,
+  // ab der Hälfte von der anderen Seite mit der nächsten Bahn hereinkommen lassen
+  // nur die Card verschieben: ein Transform am Widget selbst würde die fixierte Quellenangabe mitziehen
+  var widget = document.querySelector('#weather-widget .ww-card'), hole3d = null;
+  function sync() {
+    var f = track.scrollLeft / (track.clientWidth || 1), i = Math.round(f), frac = f - i;
+    var o = Math.max(0, 1 - Math.abs(frac) * 2.5), x = -frac * track.clientWidth + 'px 0';
+    widget.style.translate = x; widget.style.opacity = o;
+    if (hole3d) {
+      hole3d.canvas.style.translate = x; hole3d.canvas.style.opacity = o;
+      [].forEach.call(slides, function (sl, j) { sl.querySelector('.hole-img').style.opacity = j === i ? 1 - o : 1; });
+    }
+  }
+  track.addEventListener('scroll', sync, { passive: true });
+
+  // 3D: Grafik auf fein unterteilter Fläche, Tiefenkarte (hole-depth.png, erzeugt mit depth.py) hebt Bäume/Vordergrund an
+  if (window.THREE) (function () {
+    var canvas = document.createElement('canvas');
+    canvas.className = 'hole-3d'; canvas.setAttribute('aria-hidden', 'true');
+    track.parentNode.appendChild(canvas);
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    var scene = new THREE.Scene(), A = 1122 / 896; // Höhe/Breite der Grafik
+    var camera = new THREE.PerspectiveCamera(30, 1 / A, 0.1, 100);
+    camera.position.z = A * 1.2 / (2 * Math.tan(15 * Math.PI / 180)); // Fläche füllt die inneren 1/1.2 der Canvas
+    var loader = new THREE.TextureLoader(), pending = 2;
+    loader.setCrossOrigin('anonymous');
+    var loaded = function () { if (--pending === 0) { hole3d = { canvas: canvas }; sync(); } };
+    var mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, A, 220, 275), new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: loader.load(first.querySelector('.hole-img').src, loaded) },
+        depth: { value: loader.load('hole-depth.png', loaded) },
+        scale: { value: 0.18 }
+      },
+      vertexShader: 'uniform sampler2D depth; uniform float scale; varying vec2 vUv;' +
+        'void main() { vUv = uv; vec3 p = position; p.z += (texture2D(depth, uv).r - 0.5) * scale;' +
+        'gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+      fragmentShader: 'uniform sampler2D map; varying vec2 vUv;' +
+        'void main() { vec4 c = texture2D(map, vUv); if (c.a < 0.5) discard; gl_FragColor = c; }'
+    }));
+    scene.add(mesh);
+
+    // leichte Neigung (±8°) und Drehung (±15°) folgen dem Zeiger im ganzen Fenster (Ausschlag relativ zur Bahnmitte,
+    // voll am Fensterrand); verlässt der Zeiger das Fenster, erst nach 2 s sanft zurück in Ruhelage
+    var tx = 0, ty = 0, restTimer, clamp = function (v) { return Math.max(-1, Math.min(1, v)); };
+    addEventListener('pointermove', function (e) {
+      var r = canvas.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var nx = clamp((e.clientX - cx) / Math.max(cx, innerWidth - cx));
+      var ny = clamp((e.clientY - cy) / Math.max(cy, innerHeight - cy));
+      ty = nx * 0.26; tx = ny * 0.14;
+      clearTimeout(restTimer);
+    }, { passive: true });
+    document.documentElement.addEventListener('mouseleave', function () {
+      restTimer = setTimeout(function () { tx = ty = 0; }, 2000);
+    });
+
+    (function frame() {
+      requestAnimationFrame(frame);
+      if (!document.body.classList.contains('view-platz') || !hole3d) return;
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (canvas.width !== Math.round(w * renderer.getPixelRatio())) renderer.setSize(w, h, false);
+      mesh.rotation.x += (tx - mesh.rotation.x) * 0.08;
+      mesh.rotation.y += (ty - mesh.rotation.y) * 0.08;
+      renderer.render(scene, camera);
+    })();
+  })();
+
+  // bei Größenänderung auf der aktuellen Bahn bleiben (resize läuft vor dem scroll-Event, idx ist also noch alt)
+  addEventListener('resize', function () { track.scrollTo({ left: idx * track.clientWidth, behavior: 'instant' }); });
+  update();
+  sync();
+})();
+
+// Windlinien im Hintergrund: Partikel mit ausblendenden Spuren, strömen aus der im Widget angezeigten Richtung
+(function () {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var c = document.getElementById('wind-bg'), ctx = c.getContext('2d');
+  var vx = 0, vy = 0, w, h, t = 0, ps = [];
+  var spawn = function () { return { x: Math.random() * w, y: Math.random() * h, age: Math.random() * 200 }; };
+  function resize() {
+    var d = devicePixelRatio || 1;
+    w = innerWidth; h = innerHeight; c.width = w * d; c.height = h * d;
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    ps = Array.from({ length: Math.round(w * h / 5000) }, spawn);
+  }
+  function setWind(wd) {
+    var b = (wd.dir + 180) * Math.PI / 180; // "aus NO" heißt: strömt nach SW
+    var v = 0.6 + Math.min(wd.speed || 0, 15) * 0.3;
+    vx = Math.sin(b) * v; vy = -Math.cos(b) * v;
+  }
+  if (weatherWidget.wind) setWind(weatherWidget.wind); // Daten kamen schon vor diesem Skript
+  document.addEventListener('ww:wind', function (e) { setWind(e.detail); });
+  function frame() {
+    if (!document.body.classList.contains('view-platz')) return requestAnimationFrame(frame); // nur in der Platzansicht
+    t += 0.003;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,.06)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(110,120,140,.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ps.forEach(function (p, i) {
+      var a = Math.sin(p.x * .004 + t) * Math.cos(p.y * .004 - t) * .35; // leichte Verwirbelung
+      var dx = vx * Math.cos(a) - vy * Math.sin(a), dy = vx * Math.sin(a) + vy * Math.cos(a);
+      ctx.moveTo(p.x, p.y); p.x += dx; p.y += dy; ctx.lineTo(p.x, p.y);
+      if (++p.age > 220 || p.x < 0 || p.x > w || p.y < 0 || p.y > h) { ps[i] = spawn(); ps[i].age = 0; }
+    });
+    ctx.stroke();
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', resize);
+  resize();
+  frame();
+})();
+</script>
 </body>
 </html>
