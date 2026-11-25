@@ -43,31 +43,50 @@
      "backwards" statt "both": nach der Animation gelten wieder die Inline-Opacities des Sliders */
   @keyframes pv-in { from { opacity: 0; transform: translateY(16px); } }
   @keyframes pv-model { from { opacity: 0; transform: scale(.96); } }
-  body.view-platz .hole > * { animation: pv-in .6s cubic-bezier(.2,.7,.2,1) .5s backwards; } /* Titel, PAR, HCP, Name nacheinander */
-  body.view-platz .hole > :nth-child(2) { animation-delay: .62s; }
-  body.view-platz .hole > :nth-child(3) { animation-delay: .74s; }
-  body.view-platz .hole > :nth-child(4) { animation-delay: .86s; }
-  body.view-platz .hole-img, body.view-platz .hole-3d { animation: pv-model .8s cubic-bezier(.2,.7,.2,1) backwards; }
-  body.view-platz #weather-widget { --ww-base: 1.2s; }
+  body.view-platz .hole > *, body.view-top .hole > * { animation: pv-in .6s cubic-bezier(.2,.7,.2,1) .5s backwards; } /* Titel, PAR, HCP, Name nacheinander */
+  body.view-platz .hole > :nth-child(2), body.view-top .hole > :nth-child(2) { animation-delay: .62s; }
+  body.view-platz .hole > :nth-child(3), body.view-top .hole > :nth-child(3) { animation-delay: .74s; }
+  body.view-platz .hole > :nth-child(4), body.view-top .hole > :nth-child(4) { animation-delay: .86s; }
+  body.view-platz .hole-img, body.view-platz .hole-3d, body.view-top .topview { animation: pv-model .8s cubic-bezier(.2,.7,.2,1) backwards; }
+  body.view-platz #weather-widget, body.view-top #weather-widget { --ww-base: 1.2s; }
   @keyframes pv-fade { from { opacity: 0; } } /* nur Opacity: die Pfeile nutzen transform zur Zentrierung */
   body.view-platz .hole-nav, body.view-platz .dots { animation: pv-fade .6s ease 2.6s backwards; } /* Slider-Steuerung zuletzt, nach den Wetterdaten */
-  @media (prefers-reduced-motion: reduce) { body.view-platz .hole > *, body.view-platz .hole-img, body.view-platz .hole-3d, body.view-platz .hole-nav, body.view-platz .dots { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { body.view-platz .hole > *, body.view-platz .hole-img, body.view-platz .hole-3d, body.view-platz .hole-nav, body.view-platz .dots, body.view-top .hole > *, body.view-top .topview { animation: none; } }
   .demo-ctrl { position: fixed; left: 16px; bottom: 12px; display: flex; gap: 16px; }
-  .demo-ctrl button { padding: 0; border: 0; background: none; color: #0b1f4b; font: 500 13px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .demo-ctrl button { padding: 0; border: 0; background: none; color: #0b1f4b; font: 500 11px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; } /* Fußleiste einheitlich 11px wie die Quellenangabe */
   .demo-ctrl button:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 2px; }
   /* Tab 3D-Ansicht: echtes 3D-Modell der Bahn */
   .model3d { display: none; }
-  body.view-3d .model3d { display: block; position: fixed; inset: 70px 0 40px; }
+  body.view-3d .model3d { display: block; position: fixed; inset: 70px 0 120px; } /* unten Platz für Uhrzeit-Slider und Hinweis */
   body.view-3d #weather-widget { position: fixed; top: 0; bottom: 0; right: 32px; display: flex; align-items: center; pointer-events: none; z-index: 1; }
   body.view-3d #weather-widget .ww-col:first-child { display: none; } /* Platzstatus hier ausgeblendet */
   .model3d canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
   .model3d canvas:active { cursor: grabbing; }
-  .model3d-hint { position: absolute; left: 0; right: 0; bottom: -28px; /* unter der Canvas, auf Höhe der Demo-Links */ margin: 0; text-align: center; font-size: 13px; opacity: .6; }
+  .model3d-hint { position: absolute; left: 0; right: 0; bottom: -112px; /* unter der Canvas, auf Höhe der Demo-Links */ margin: 0; text-align: center; font-size: 11px; opacity: .6; }
   /* Kompass im Stil der Wetterdaten (Variante .ww-stack): Icon links, Wert fett, Subline darunter */
   .compass { position: absolute; top: 16px; right: 32px; display: grid; grid-template-columns: 56px auto; column-gap: 16px; align-items: center; color: #0b1f4b; font-variant-numeric: tabular-nums; }
   .compass-icon { grid-row: span 2; width: 56px; height: 56px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
   .compass-value { align-self: end; min-width: 4.5em; font-size: 28px; font-weight: 800; line-height: 1.15; }
   .compass-label { align-self: start; font-size: 15px; line-height: 1.4; }
+  /* Uhrzeit-Slider für den Sonnenstand */
+  .daytime { position: absolute; left: 50%; bottom: -84px; width: min(420px, calc(100% - 32px)); transform: translateX(-50%); color: #0b1f4b; font-variant-numeric: tabular-nums; }
+  /* Tab Topview: statische Draufsicht, Bahn-Angaben links und Wetter rechts wie in der Tiefenansicht */
+  .top-only { display: none; }
+  body.view-top .stage { display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: center; }
+  body.view-top .top-only { display: block; }
+  body.view-top .topview { height: min(calc(100vh - 140px), 1100px); width: auto; }
+  body.view-top #weather-widget { justify-self: start; }
+  body.view-top #weather-widget .ww-col:first-child { display: none; }
+  .daytime-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .daytime-head strong { font-size: 20px; font-weight: 800; }
+  .daytime-head button { margin-left: auto; padding: 0; border: 0; background: none; color: inherit; font: 500 11px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; } /* Fußleiste einheitlich 11px wie die Quellenangabe */
+  .daytime-track { position: relative; padding-bottom: 20px; }
+  .daytime input { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 6px; margin: 0; border-radius: 3px; background: var(--dt-grad, #d6dbe6); cursor: pointer; }
+  .daytime input::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: #0b1f4b; box-shadow: 0 0 0 1px #0b1f4b; }
+  .daytime input::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid #fff; border-radius: 50%; background: #0b1f4b; box-shadow: 0 0 0 1px #0b1f4b; }
+  .daytime input:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 4px; }
+  .dt-mark { position: absolute; top: 12px; transform: translateX(-50%); font-size: 12px; white-space: nowrap; opacity: .75; pointer-events: none; }
+  .dt-mark::before { content: ""; position: absolute; left: 50%; top: -9px; width: 1px; height: 7px; background: currentColor; }
   #wind-bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
   body:not(.view-platz) #wind-bg { display: none; }
 </style>
@@ -76,10 +95,18 @@
 <canvas id="wind-bg" aria-hidden="true"></canvas>
 <nav class="tabs" aria-label="Ansicht">
   <a href="#">Übersicht</a>
+  <a href="#top">Topview</a>
   <a href="#platz">Tiefenansicht</a>
   <a href="#3d">3D-Ansicht</a>
 </nav>
 <main class="stage">
+<div class="hole top-only">
+  <div class="hole-nr">Bahn 1</div>
+  <div class="hole-meta">PAR 4</div>
+  <div class="hole-meta">HCP 3/4</div>
+  <div class="hole-name">Achtern Diek</div>
+</div>
+<img class="topview top-only" src="topview.png" alt="Draufsicht der Bahn mit Fairway, Teich und Bunkern">
 <div class="holes" id="holes" tabindex="0" aria-label="Bahnen 1 bis 9">
 <section class="slide" aria-label="Bahn 1">
 <div class="hole">
@@ -242,6 +269,7 @@
     $('ww-dir').textContent = v.dir == null ? 'Wind' : 'aus ' + DIRS[Math.round(v.dir / 45) % 8];
     // für optionale Effekte außerhalb des Widgets (z. B. Windlinien); Richtung = angezeigter Sektor
     // weatherWidget.wind hält den letzten Wert für Skripte, die erst nach dem Event laden
+    $('weather-widget').dispatchEvent(new CustomEvent('ww:update', { bubbles: true, detail: weatherWidget.current = v }));
     if (v.dir != null) $('weather-widget').dispatchEvent(new CustomEvent('ww:wind', { bubbles: true, detail: weatherWidget.wind = { dir: Math.round(v.dir / 45) % 8 * 45, speed: v.speed } }));
   }
 
@@ -284,7 +312,14 @@
 </main>
 <div class="model3d" id="model3d">
   <canvas aria-label="3D-Modell von Bahn 1, Achtern Diek" role="img"></canvas>
-  <p class="model3d-hint">Ziehen zum Drehen · Scrollen zum Zoomen</p>
+  <p class="model3d-hint">Ziehen zum Drehen · ⌘/Strg + Ziehen zum Verschieben · Scrollen zum Zoomen</p>
+  <div class="daytime">
+    <div class="daytime-head"><strong id="dt-time">–</strong><span id="dt-sun">Sonnenstand</span><button type="button" id="dt-now" hidden>Jetzt</button></div>
+    <div class="daytime-track">
+      <input type="range" id="dt-range" min="0" max="1439" step="1" aria-label="Uhrzeit für den Sonnenstand">
+      <span class="dt-mark" id="dt-rise"></span><span class="dt-mark" id="dt-set"></span>
+    </div>
+  </div>
   <div class="compass">
     <svg class="compass-icon" viewBox="0 0 24 24" aria-hidden="true"><g id="compass-rose"><circle cx="12" cy="12" r="10"/><path d="M12 4.5l2.4 7.5h-4.8z" fill="currentColor"/><path d="M12 19.5l2.4-7.5h-4.8z"/></g></svg>
     <div class="compass-value" id="compass-dir">N 0°</div>
@@ -302,13 +337,14 @@
 (function () {
   var widget = document.getElementById('weather-widget');
   function route() {
-    var platz = location.hash === '#platz', three = location.hash === '#3d';
+    var hash = ['#platz', '#3d', '#top'].indexOf(location.hash) >= 0 ? location.hash : '#';
+    var platz = hash === '#platz', three = hash === '#3d';
     document.body.classList.toggle('view-platz', platz);
     document.body.classList.toggle('view-3d', three);
-    widget.classList.toggle('ww-stack', platz || three);
+    document.body.classList.toggle('view-top', hash === '#top');
+    widget.classList.toggle('ww-stack', platz || three || hash === '#top');
     document.querySelectorAll('.tabs a').forEach(function (a) {
-      var href = a.getAttribute('href'), on = platz ? href === '#platz' : three ? href === '#3d' : href === '#';
-      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      if (a.getAttribute('href') === hash) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     var replay = function () { // Intro-Animation erneut abspielen
       document.getAnimations().forEach(function (a) { if (a.animationName === 'ww-up') { a.currentTime = 0; a.play(); } });
@@ -325,12 +361,38 @@
 
 // 3D-Ansicht: Modell aus 3d/ (erzeugt mit model3d.py aus der Illustration): Gelände mit Höhen, Erdsockel,
 // Wasser, Bäume, Hütte, Fahne. Wird erst beim ersten Öffnen des Tabs gebaut.
+
+// Sonnenstand (vereinfachte Astronomie-Formeln, Genauigkeit ~1°): alt = Höhe, az = Azimut ab Norden im Uhrzeigersinn, beides Radiant
+function sunPos(date, lat, lon) {
+  var r = Math.PI / 180, d = date / 864e5 - 10957.5; // Tage seit 1.1.2000 12:00 UTC
+  var g = (357.529 + 0.98560028 * d) * r, L = (280.459 + 0.98564736 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * r;
+  var e = (23.439 - 0.00000036 * d) * r, ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)), dec = Math.asin(Math.sin(e) * Math.sin(L));
+  var H = ((18.697374558 + 24.06570982441908 * d) * 15 + lon) * r - ra, phi = lat * r;
+  return {
+    alt: Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H)),
+    az: Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi)) + Math.PI
+  };
+}
+// Auf- und Untergang in Minuten nach Mitternacht (Ortszeit): erster/letzter Moment über −0,833° (Refraktion + Sonnenradius)
+function sunTimes(date, lat, lon) {
+  var t = new Date(date), rise = null, set = null, lim = -0.833 * Math.PI / 180;
+  for (var m = 0; m < 1440; m++) { t.setHours(0, m, 0, 0); if (sunPos(t, lat, lon).alt > lim) { if (rise == null) rise = m; set = m; } }
+  return { rise: rise, set: set };
+}
+console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061, 9.5667).alt * 180 / Math.PI - 59.5) < 1.5, 'sunPos: Mittagshöhe zur Sommersonnenwende');
+
 (function () {
-  var box = document.getElementById('model3d'), canvas = box.querySelector('canvas'), started = false;
+  var box = document.getElementById('model3d'), canvas = box.querySelector('canvas'), started = false, showModel = function () {};
   function init() {
     if (started || !window.THREE || !THREE.OrbitControls) return;
     started = true;
-    var STRETCH = 1.15; // Illustration ist schräg von oben gezeichnet: Tiefe etwas strecken
+    showModel = show;
+    // Modelle je Tab (Daten aus model3d.py). stretch: Schrägansicht ist in der Tiefe gestaucht; W = Breite in Welt-Einheiten;
+    // Startkamera: R Abstand, tilt Neigung aus der Senkrechten, z Blickziel
+    var MODELS = {
+      '#3d': { dir: '3d', stretch: 1.15, W: 10, R: 22, tilt: 30, z: 0.6 }
+    };
+    var models = {}, cur = null, rotTimer;
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
@@ -339,8 +401,11 @@
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
     var controls = new THREE.OrbitControls(camera, canvas);
-    controls.enableDamping = true; controls.enablePan = false;
-    controls.minDistance = 5; controls.maxDistance = 28;
+    controls.enableDamping = true; // Pan: OrbitControls verschiebt bei CMD/STRG/Shift + Ziehen (oder rechter Maustaste)
+    controls.addEventListener('change', function () { // Ziel auf der Bahn halten, damit man das Modell nicht aus dem Bild schiebt
+      var t = controls.target; t.x = Math.max(-5, Math.min(5, t.x)); t.y = Math.max(-0.5, Math.min(1.5, t.y)); t.z = Math.max(-6, Math.min(6, t.z));
+    });
+    controls.minDistance = 5; controls.maxDistance = 36;
     controls.minPolarAngle = 0.15; controls.maxPolarAngle = 1.3; // nicht unter den Boden
     controls.autoRotateSpeed = 0.4;
     var touched = false;
@@ -353,6 +418,48 @@
     Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 9, bottom: -9, near: 1, far: 40 });
     sun.shadow.normalBias = 0.02;
     scene.add(sun);
+    var hemi = scene.children[0];
+
+    // Sonnenstand für Schloss Breitenburg: Licht kommt aus der echten Himmelsrichtung/Höhe (Norden = -z, Osten = +x),
+    // Bewölkung (aus dem Wettercode) macht Sonne schwächer und Schatten blasser
+    var LAT = 53.9061, LON = 9.5667, liveTime = true, minute = 0;
+    var rangeEl = document.getElementById('dt-range'), nowBtn = document.getElementById('dt-now');
+    var hhmm = function (m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math.round(m % 60)).padStart(2, '0'); };
+    var atMinute = function (m) { var t = new Date(); t.setHours(0, m, 0, 0); return t; }; // shortcut: Browser-Zeitzone, für Besucher außerhalb DE auf Europe/Berlin umstellen
+    var cloudiness = function () {
+      var c = weatherWidget.current && weatherWidget.current.code;
+      return c == null ? 0.3 : c === 0 ? 0 : c === 1 ? 0.2 : c === 2 ? 0.5 : c === 3 ? 0.85 : 1;
+    };
+    var sunDay = null, sunDayKey = '';
+    function updateSun() {
+      var date = atMinute(minute), p = sunPos(date, LAT, LON), deg = 180 / Math.PI;
+      var key = date.toDateString();
+      if (key !== sunDayKey) { // Auf-/Untergang einmal pro Tag bestimmen und in den Slider zeichnen
+        sunDayKey = key; sunDay = sunTimes(date, LAT, LON);
+        var pr = sunDay.rise / 14.4, ps = sunDay.set / 14.4; // Minuten → Prozent der Slider-Breite
+        document.getElementById('dt-rise').style.left = pr + '%'; document.getElementById('dt-rise').textContent = '↑ ' + hhmm(sunDay.rise) + ' Aufgang';
+        document.getElementById('dt-set').style.left = ps + '%'; document.getElementById('dt-set').textContent = '↓ ' + hhmm(sunDay.set) + ' Untergang';
+        rangeEl.style.setProperty('--dt-grad', 'linear-gradient(90deg, #c9cfdc ' + (pr - 2) + '%, #f6d27a ' + (pr + 2) + '%, #f6d27a ' + (ps - 2) + '%, #c9cfdc ' + (ps + 2) + '%)');
+      }
+      var dir = new THREE.Vector3(Math.sin(p.az) * Math.cos(p.alt), Math.sin(p.alt), -Math.cos(p.az) * Math.cos(p.alt));
+      sun.position.copy(dir.multiplyScalar(20));
+      var cl = cloudiness(), up = Math.max(0, Math.min(1, Math.sin(p.alt) * 4)); // ab ~15° Höhe volle Kraft
+      var dusk = Math.max(0, Math.min(1, (p.alt * deg + 6) / 8)); // Dämmerung −6° … +2°
+      sun.intensity = 0.95 * up * (1 - 0.8 * cl);
+      sun.color.setHSL(0.1, 1, 0.5 + 0.5 * Math.min(1, p.alt * deg / 25)); // tiefe Sonne warm, hohe Sonne weiß
+      hemi.intensity = 0.12 + 0.45 * dusk + 0.2 * cl * dusk; // bedeckt: mehr diffuses Licht
+      hemi.color.setHSL(0.6, 0.5 * (1 - dusk), 0.75 + 0.25 * dusk); // nachts bläulich
+      rangeEl.value = Math.round(minute);
+      document.getElementById('dt-time').textContent = hhmm(minute) + ' Uhr';
+      document.getElementById('dt-sun').textContent = p.alt < -0.0145 ? 'Sonne unter dem Horizont' : 'Sonne ' + Math.round(p.alt * deg) + '° hoch';
+      nowBtn.hidden = liveTime;
+    }
+    function tickLive() { if (!liveTime) return; var n = new Date(); minute = n.getHours() * 60 + n.getMinutes(); updateSun(); }
+    rangeEl.addEventListener('input', function () { liveTime = false; minute = +rangeEl.value; updateSun(); });
+    nowBtn.addEventListener('click', function () { liveTime = true; tickLive(); });
+    document.addEventListener('ww:update', updateSun);
+    setInterval(tickLive, 60000);
+    tickLive();
 
     var C = function (hex) { return new THREE.Color(hex).convertSRGBToLinear(); }; // Farben wie im Bild (sRGB) angeben
     var tex = new THREE.TextureLoader();
@@ -360,12 +467,38 @@
       var t = tex.load(url); if (srgb) t.encoding = THREE.sRGBEncoding;
       t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
     };
-    Promise.all([
-      fetch('3d/hole.json').then(function (r) { return r.json(); }),
-      new Promise(function (ok) { var i = new Image(); i.onload = function () { ok(i); }; i.src = '3d/height.png'; })
+    // Startansicht des aktuellen Modells; nach 2 s ohne Eingriff langsam drehen (auch für "Zurücksetzen")
+    function resetView() {
+      var m = MODELS[cur], TILT = m.tilt * Math.PI / 180;
+      controls.autoRotate = false; touched = false; clearTimeout(rotTimer);
+      controls.target.set(0, 0, m.z);
+      camera.position.set(0, m.R * Math.cos(TILT), m.z + m.R * Math.sin(TILT));
+      controls.update();
+      rotTimer = setTimeout(function () { if (!touched) controls.autoRotate = true; }, 2000);
+    }
+    document.addEventListener('demo:reset', function () { if (cur) resetView(); liveTime = true; tickLive(); });
+
+    // Modell zum Tab zeigen; jedes wird beim ersten Aufruf einmal gebaut und danach nur ein-/ausgeblendet
+    function show(key) {
+      if (!MODELS[key] || key === cur) return;
+      cur = key;
+      Object.keys(models).forEach(function (k) { models[k].group.visible = k === key; });
+      if (models[key]) return use(models[key]);
+      var mdl = models[key] = { group: new THREE.Group() };
+      scene.add(mdl.group);
+      build(MODELS[key], mdl).then(function () { if (cur === key) use(mdl); });
+    }
+    function use(mdl) { flag = mdl.flag; flagX = mdl.flagX; HW = mdl.W / 2 + 2; HD = mdl.D / 2 + 1; resetView(); box.classList.add('ready'); }
+
+    function build(cfg, mdl) {
+    var STRETCH = cfg.stretch, dir = cfg.dir + '/', group = mdl.group;
+    return Promise.all([
+      fetch(dir + 'hole.json').then(function (r) { return r.json(); }),
+      new Promise(function (ok) { var i = new Image(); i.onload = function () { ok(i); }; i.src = dir + 'height.png'; })
     ]).then(function (res) {
       var d = res[0], hImg = res[1];
-      var W = 10, D = W * d.h / d.w * STRETCH, DISP = 0.35; // Wasser liegt damit knapp über der Sockelunterkante
+      var W = cfg.W, D = W * d.h / d.w * STRETCH, DISP = 0.35;
+      mdl.W = W; mdl.D = D; // Wasser liegt damit knapp über der Sockelunterkante
       var X = function (u) { return (u - 0.5) * W; }, Z = function (v) { return (v - 0.5) * D; };
       // Geländehöhe an (u, v) aus height.png, gleiche Formel wie die Displacement-Map unten
       var c2 = document.createElement('canvas'); c2.width = hImg.width; c2.height = hImg.height;
@@ -378,25 +511,25 @@
       };
 
       // Gelände: fein unterteilte Fläche, Höhe per Displacement, Umriss per Alpha der Textur
-      var gGeo = new THREE.PlaneGeometry(W, D, 300, 430); gGeo.rotateX(-Math.PI / 2);
+      var gGeo = new THREE.PlaneGeometry(W, D, 300, Math.round(300 * D / W)); gGeo.rotateX(-Math.PI / 2);
       var ground = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({
-        map: load('3d/ground.png', true), displacementMap: load('3d/height.png'),
+        map: load(dir + 'ground.png', true), displacementMap: load(dir + 'height.png'),
         displacementScale: DISP, displacementBias: -DISP / 2, alphaTest: 0.5, roughness: 0.95
       }));
-      ground.receiveShadow = true; scene.add(ground);
+      ground.receiveShadow = true; group.add(ground);
 
       // Erdsockel: nur die Seitenwände des extrudierten Umrisses (Deckel unsichtbar, sonst verdeckt er Wasser/Bunker)
       var shape = new THREE.Shape(d.outline.map(function (p) { return new THREE.Vector2(X(p[0]), -Z(p[1])); }));
       var slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: false }),
         [new THREE.MeshBasicMaterial({ visible: false }), new THREE.MeshStandardMaterial({ color: C(0x6b4b2e), roughness: 1 })]);
-      slab.rotation.x = -Math.PI / 2; slab.position.y = -0.15; scene.add(slab);
+      slab.rotation.x = -Math.PI / 2; slab.position.y = -0.15; group.add(slab);
 
       // Wasser: halbtransparente Fläche knapp unter Normalniveau, Form aus water.png
       var wGeo = new THREE.PlaneGeometry(W, D); wGeo.rotateX(-Math.PI / 2);
       var water = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
-        color: C(0x2a7fb8), alphaMap: load('3d/water.png'), transparent: true, opacity: 0.85, roughness: 0.15, metalness: 0.1, depthWrite: false
+        color: C(0x2a7fb8), alphaMap: load(dir + 'water.png'), transparent: true, opacity: 0.85, roughness: 0.15, metalness: 0.1, depthWrite: false
       }));
-      water.position.y = -0.04; scene.add(water);
+      water.position.y = -0.04; group.add(water);
 
       // Bäume: instanziert (Stamm + Krone), Größe aus der Illustration, Farbe leicht variiert
       var n = d.trees.length, m4 = new THREE.Matrix4(), col = new THREE.Color(), rnd = function (a, b) { return a + Math.random() * (b - a); };
@@ -409,48 +542,54 @@
         crowns.setMatrixAt(i, m4.compose(new THREE.Vector3(x, y + th + r * 0.8, z), q, new THREE.Vector3(r, r * rnd(1, 1.3), r)));
         crowns.setColorAt(i, col.setHSL(rnd(0.22, 0.33), rnd(0.4, 0.6), rnd(0.18, 0.3)).convertSRGBToLinear()); // Farben wie im Bild (sRGB) angeben
       });
-      [trunks, crowns].forEach(function (o) { o.castShadow = o.receiveShadow = true; scene.add(o); });
+      [trunks, crowns].forEach(function (o) { o.castShadow = o.receiveShadow = true; group.add(o); });
 
-      // Hütte (achteckiger Pavillon) und Fahne auf dem Grün
+      // Hütte (achteckiger Pavillon, falls in der Illustration) und Fahne auf dem Grün
+      if (d.hut) {
       var hut = new THREE.Group(), hx = X(d.hut[0]), hz = Z(d.hut[1]), hy = Y(d.hut[0], d.hut[1]);
       var walls = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.14, 8), new THREE.MeshStandardMaterial({ color: C(0xe8dcc4) }));
       var roof = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.13, 8), new THREE.MeshStandardMaterial({ color: C(0xa8432a), flatShading: true }));
       walls.position.y = 0.07; roof.position.y = 0.205; hut.add(walls, roof);
       hut.children.forEach(function (o) { o.castShadow = o.receiveShadow = true; });
-      hut.position.set(hx, hy, hz); scene.add(hut);
+      hut.position.set(hx, hy, hz); group.add(hut);
+      }
       var fx = X(d.flag[0]), fz = Z(d.flag[1]), fy = Y(d.flag[0], d.flag[1]);
       var pin = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.5, 6), new THREE.MeshStandardMaterial({ color: 0xffffff }));
       pin.position.set(fx, fy + 0.25, fz); pin.castShadow = true;
-      var flagShape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.16, -0.05), new THREE.Vector2(0, -0.1)]);
-      var flag = new THREE.Mesh(new THREE.ShapeGeometry(flagShape), new THREE.MeshStandardMaterial({ color: C(0xd93a2b), side: THREE.DoubleSide }));
+      // Fahne als unterteiltes Rechteck (Mast an x = 0), damit sie im Wind wehen kann
+      var fGeo = new THREE.PlaneGeometry(0.16, 0.1, 10, 1); fGeo.translate(0.08, -0.05, 0);
+      var flag = new THREE.Mesh(fGeo, new THREE.MeshStandardMaterial({ color: C(0xd93a2b), side: THREE.DoubleSide }));
       flag.position.set(fx, fy + 0.5, fz); flag.castShadow = true;
-      scene.add(pin, flag);
-
-      // Startansicht wie die Illustration (Tiefenansicht): von Süden (Abschlag unten) nach Norden, 30° aus der Senkrechten
-      // (Illustration ist in der Tiefe um 1/1.15 gestaucht → Blick ca. 60° über dem Horizont). Nach 2 s langsam drehen.
-      var R = 22, TILT = 30 * Math.PI / 180;
-      controls.target.set(0, 0, 0.6);
-      camera.position.set(0, R * Math.cos(TILT), 0.6 + R * Math.sin(TILT));
-      controls.update();
-      setTimeout(function () { if (!touched) controls.autoRotate = true; }, 2000);
-      box.classList.add('ready');
+      mdl.flag = flag; mdl.flagX = Float32Array.from(fGeo.attributes.position.array.filter(function (_, i) { return i % 3 === 0; }));
+      group.add(pin, flag);
     });
+    }
+
 
     // Wind im Modell: kurze helle Striche, die in Windrichtung über die Bahn ziehen (Weltkoordinaten: Norden = -z, Osten = +x),
     // dadurch reagieren sie von selbst auf Drehung und Neigung der Kamera
     // (schmale Quader statt Linien: WebGL zeichnet Linien immer nur 1 px breit)
-    var N = 450, LIFE = 2.5, wv = new THREE.Vector3(), streaks = [];
+    var N = 450, LIFE = 2.5, wv = new THREE.Vector3(), streaks = [], flag, flagX, windSpeed = 0, HW = 7, HD = 9;
     var sMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.03, 0.012, 1),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), N);
     scene.add(sMesh);
     var sM = new THREE.Matrix4(), sP = new THREE.Vector3(), sQ = new THREE.Quaternion(), sS = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
-    var spawn = function (st) { st.x = (Math.random() - 0.5) * 14; st.z = (Math.random() - 0.5) * 18; st.y = 0.25 + Math.random() * 1.2; st.age = 0; st.life = LIFE * (0.6 + Math.random() * 0.8); return st; };
+    var spawn = function (st) { st.x = (Math.random() * 2 - 1) * HW; st.z = (Math.random() * 2 - 1) * HD; st.y = 0.25 + Math.random() * 1.2; st.age = 0; st.life = LIFE * (0.6 + Math.random() * 0.8); return st; };
     for (var k = 0; k < N; k++) { streaks.push(spawn({})); streaks[k].age = Math.random() * streaks[k].life; }
     function setWind(w) {
       var b = (w.dir + 180) * Math.PI / 180; // "aus NO" strömt nach SW
       var v = 0.4 + Math.min(w.speed || 0, 15) * 0.18;
       wv.set(Math.sin(b) * v, 0, -Math.cos(b) * v);
       sQ.setFromAxisAngle(up, Math.atan2(wv.x, wv.z)); // Streifen entlang der Windrichtung ausrichten
+      windSpeed = Math.min(w.speed || 0, 15);
+    }
+    // Fahne zeigt in Windrichtung (lokal +x → wv) und flattert: Welle läuft vom Mast nach außen, stärker bei mehr Wind
+    function flutter(now) {
+      if (!flag) return;
+      flag.rotation.y = Math.atan2(-wv.z, wv.x) + Math.sin(now / 900) * 0.08;
+      var pos = flag.geometry.attributes.position, t = now / 1000, amp = 0.004 + windSpeed * 0.0016, f = 5 + windSpeed * 0.9;
+      for (var i = 0; i < pos.count; i++) { var x = flagX[i]; pos.setZ(i, Math.sin(x * 40 - t * f) * amp * (x / 0.16)); }
+      pos.needsUpdate = true; flag.geometry.computeVertexNormals();
     }
     if (weatherWidget.wind) setWind(weatherWidget.wind);
     document.addEventListener('ww:wind', function (e) { setWind(e.detail); });
@@ -460,12 +599,13 @@
       for (var i = 0; i < N; i++) {
         var st = streaks[i];
         st.age += dt; st.x += wv.x * dt; st.z += wv.z * dt;
-        if (st.age > st.life || Math.abs(st.x) > 7 || Math.abs(st.z) > 9) spawn(st);
+        if (st.age > st.life || Math.abs(st.x) > HW || Math.abs(st.z) > HD) spawn(st);
         var len = 0.7 * Math.sin(Math.PI * st.age / st.life) * Math.min(1, wv.length()); // wächst beim Entstehen, schrumpft vor dem Verschwinden
         sP.set(st.x, st.y, st.z); sS.z = Math.max(len, 0.0001);
         sMesh.setMatrixAt(i, sM.compose(sP, sQ, sS));
       }
       sMesh.instanceMatrix.needsUpdate = true;
+      flutter(now);
     }
 
     (function frame() {
@@ -498,7 +638,7 @@
       rose.setAttribute('transform', 'translate(12 12) scale(1 ' + Math.max(0.25, Math.cos(tilt * Math.PI / 180)).toFixed(3) + ') rotate(' + (-hdg) + ') translate(-12 -12)');
     }
   }
-  function check() { if (location.hash === '#3d') init(); }
+  function check() { if (location.hash === '#3d') { init(); showModel(location.hash); } }
   addEventListener('hashchange', check);
   check();
 })();
@@ -515,7 +655,7 @@
       code: pick(CODES), isDay: Math.random() < .7 ? 1 : 0
     });
   };
-  document.getElementById('reset').onclick = function () { weatherWidget.reset(); };
+  document.getElementById('reset').onclick = function () { weatherWidget.reset(); document.dispatchEvent(new Event('demo:reset')); }; // auch Kamera + Uhrzeit
 })();
 
 // Bahn-Slider: Bahn 1 wird für 2–9 dupliziert (shortcut: gleicher Inhalt, später echte Daten je Bahn)
