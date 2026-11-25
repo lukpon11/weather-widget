@@ -77,6 +77,17 @@
   body.view-top .topview { height: min(calc(100vh - 140px), 1100px); width: auto; }
   body.view-top #weather-widget { justify-self: start; }
   body.view-top #weather-widget .ww-col:first-child { display: none; }
+  body.view-brand .daytime { display: none; } /* Netz-Ansicht ist unbeleuchtet: kein Sonnenstand */
+  body.view-brand .model3d { bottom: 40px; }
+  body.view-brand .model3d-hint { bottom: -32px; }
+  .flyover { position: absolute; top: 16px; left: 32px; padding: 8px 18px; border: 2px solid #0b1f4b; border-radius: 999px; background: #fff; color: #0b1f4b; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  .flyover:hover:not(:disabled) { background: #0b1f4b; color: #fff; }
+  .flyover { display: inline-flex; align-items: center; gap: 8px; }
+  .flyover.busy { cursor: progress; opacity: .7; }
+  .flyover.busy::before { content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: fly-spin .8s linear infinite; }
+  @keyframes fly-spin { to { transform: rotate(360deg); } }
+  .flyover:focus-visible { outline: 2px solid #0b1f4b; outline-offset: 3px; }
+  body.view-brand .flyover { display: none; } /* nur in der 3D-Ansicht */
   .daytime-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
   .daytime-head strong { font-size: 20px; font-weight: 800; }
   .daytime-head button { margin-left: auto; padding: 0; border: 0; background: none; color: inherit; font: 500 11px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; } /* Fußleiste einheitlich 11px wie die Quellenangabe */
@@ -98,6 +109,7 @@
   <a href="#top">Topview</a>
   <a href="#platz">Tiefenansicht</a>
   <a href="#3d">3D-Ansicht</a>
+  <a href="#brand">Branded</a>
 </nav>
 <main class="stage">
 <div class="hole top-only">
@@ -320,6 +332,7 @@
       <span class="dt-mark" id="dt-rise"></span><span class="dt-mark" id="dt-set"></span>
     </div>
   </div>
+  <button type="button" class="flyover" id="flyover">Überflug</button>
   <div class="compass">
     <svg class="compass-icon" viewBox="0 0 24 24" aria-hidden="true"><g id="compass-rose"><circle cx="12" cy="12" r="10"/><path d="M12 4.5l2.4 7.5h-4.8z" fill="currentColor"/><path d="M12 19.5l2.4-7.5h-4.8z"/></g></svg>
     <div class="compass-value" id="compass-dir">N 0°</div>
@@ -337,11 +350,12 @@
 (function () {
   var widget = document.getElementById('weather-widget');
   function route() {
-    var hash = ['#platz', '#3d', '#top'].indexOf(location.hash) >= 0 ? location.hash : '#';
-    var platz = hash === '#platz', three = hash === '#3d';
+    var hash = ['#platz', '#3d', '#top', '#brand'].indexOf(location.hash) >= 0 ? location.hash : '#';
+    var platz = hash === '#platz', three = hash === '#3d' || hash === '#brand'; // Branded = gleiche 3D-Szene als Navy-Netz
     document.body.classList.toggle('view-platz', platz);
     document.body.classList.toggle('view-3d', three);
     document.body.classList.toggle('view-top', hash === '#top');
+    document.body.classList.toggle('view-brand', hash === '#brand');
     widget.classList.toggle('ww-stack', platz || three || hash === '#top');
     document.querySelectorAll('.tabs a').forEach(function (a) {
       if (a.getAttribute('href') === hash) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
@@ -390,7 +404,11 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
     // Modelle je Tab (Daten aus model3d.py). stretch: Schrägansicht ist in der Tiefe gestaucht; W = Breite in Welt-Einheiten;
     // Startkamera: R Abstand, tilt Neigung aus der Senkrechten, z Blickziel
     var MODELS = {
-      '#3d': { dir: '3d', stretch: 1.15, W: 10, R: 22, tilt: 30, z: 0.6 }
+      // flight: Überflug-Wegpunkte (u, v im Bild): auf dem Abschlag in Augenhöhe, Fairway hoch bis zum Knick, links Richtung Grün
+      // shortcut: von Hand an dieser Illustration abgelesen; für weitere Bahnen eigene Wegpunkte eintragen
+      '#3d': { dir: '3d', stretch: 1.15, W: 10, R: 22, tilt: 30, z: 0.6,
+        flight: [[0.43, 0.78], [0.6, 0.63], [0.74, 0.5], [0.74, 0.38], [0.70, 0.27], [0.46, 0.2]] },
+      '#brand': { dir: '3d', stretch: 1.15, W: 10, R: 22, tilt: 30, z: 0.6, mesh: true }
     };
     var models = {}, cur = null, rotTimer;
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
@@ -445,9 +463,9 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
       sun.position.copy(dir.multiplyScalar(20));
       var cl = cloudiness(), up = Math.max(0, Math.min(1, Math.sin(p.alt) * 4)); // ab ~15° Höhe volle Kraft
       var dusk = Math.max(0, Math.min(1, (p.alt * deg + 6) / 8)); // Dämmerung −6° … +2°
-      sun.intensity = 0.95 * up * (1 - 0.8 * cl);
+      sun.intensity = 1.2 * up * (1 - 0.6 * cl); // kräftige Sonne + wenig Umgebungslicht = deutlichere Schatten
       sun.color.setHSL(0.1, 1, 0.5 + 0.5 * Math.min(1, p.alt * deg / 25)); // tiefe Sonne warm, hohe Sonne weiß
-      hemi.intensity = 0.12 + 0.45 * dusk + 0.2 * cl * dusk; // bedeckt: mehr diffuses Licht
+      hemi.intensity = 0.1 + 0.3 * dusk + 0.15 * cl * dusk; // bedeckt: mehr diffuses Licht
       hemi.color.setHSL(0.6, 0.5 * (1 - dusk), 0.75 + 0.25 * dusk); // nachts bläulich
       rangeEl.value = Math.round(minute);
       document.getElementById('dt-time').textContent = hhmm(minute) + ' Uhr';
@@ -468,14 +486,40 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
       t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
     };
     // Startansicht des aktuellen Modells; nach 2 s ohne Eingriff langsam drehen (auch für "Zurücksetzen")
-    function resetView() {
+    function home() {
       var m = MODELS[cur], TILT = m.tilt * Math.PI / 180;
+      return { p: new THREE.Vector3(0, m.R * Math.cos(TILT), m.z + m.R * Math.sin(TILT)), t: new THREE.Vector3(0, 0, m.z) };
+    }
+    function resetView() {
+      var h = home();
+      queue = []; controls.enabled = true; busy(false);
       controls.autoRotate = false; touched = false; clearTimeout(rotTimer);
-      controls.target.set(0, 0, m.z);
-      camera.position.set(0, m.R * Math.cos(TILT), m.z + m.R * Math.sin(TILT));
+      controls.target.copy(h.t); camera.position.copy(h.p);
       controls.update();
       rotTimer = setTimeout(function () { if (!touched) controls.autoRotate = true; }, 2000);
     }
+    // Überflug: erst zurück zur Startansicht (falls nötig), dann wie eine Drohne vom Abschlag über das Fairway zur Fahne.
+    // queue = Abfolge von Kamerafahrten {dur in s, fn(e) setzt Position/Ziel für e = 0…1}; frame() spielt sie ab
+    var queue = [], aStart = 0, ease = function (e) { return e < 0.5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2; };
+    var flyBtn = document.getElementById('flyover');
+    var busy = function (on) { flyBtn.disabled = on; flyBtn.classList.toggle('busy', on); flyBtn.setAttribute('aria-busy', on); };
+    flyBtn.addEventListener('click', function () {
+      var mdl = models[cur]; if (!mdl || !mdl.flight) return;
+      busy(true); // Ladezustand bis der Flug fertig ist
+      touched = true; clearTimeout(rotTimer); controls.autoRotate = false; controls.enabled = false;
+      var p0 = camera.position.clone(), t0 = controls.target.clone(), h = home();
+      queue = [];
+      if (p0.distanceTo(h.p) > 0.05 || t0.distanceTo(h.t) > 0.05) queue.push({ dur: 2.5, fn: function (e) {
+        camera.position.lerpVectors(p0, h.p, e); camera.position.y += Math.sin(Math.PI * e) * 3; // im Bogen zurück, nicht durchs Modell
+        controls.target.lerpVectors(t0, h.t, e);
+      } });
+      // 1) Anflug: aus der Startansicht auf den Abschlag sinken  2) Drohnenflug: gleichmäßig übers Fairway, am Knick links zur Fahne
+      var c0 = mdl.flight.cam[0], g0 = mdl.flight.tgt[0];
+      queue.push({ dur: 3, fn: function (e) { camera.position.lerpVectors(h.p, c0, e); controls.target.lerpVectors(h.t, g0, e); } });
+      var cam = new THREE.CatmullRomCurve3(mdl.flight.cam), tgt = new THREE.CatmullRomCurve3(mdl.flight.tgt);
+      queue.push({ dur: 14, ease: function (e) { return (1 - Math.cos(Math.PI * e)) / 2; }, fn: function (e) { camera.position.copy(cam.getPointAt(e)); controls.target.copy(tgt.getPointAt(e)); } });
+      aStart = performance.now();
+    });
     document.addEventListener('demo:reset', function () { if (cur) resetView(); liveTime = true; tickLive(); });
 
     // Modell zum Tab zeigen; jedes wird beim ersten Aufruf einmal gebaut und danach nur ein-/ausgeblendet
@@ -488,7 +532,9 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
       scene.add(mdl.group);
       build(MODELS[key], mdl).then(function () { if (cur === key) use(mdl); });
     }
-    function use(mdl) { flag = mdl.flag; flagX = mdl.flagX; HW = mdl.W / 2 + 2; HD = mdl.D / 2 + 1; resetView(); box.classList.add('ready'); }
+    function use(mdl) {
+      sMesh.visible = !MODELS[cur].mesh; // Branded: ohne Windstriche
+      flag = mdl.flag; flagX = mdl.flagX; HW = mdl.W / 2 + 2; HD = mdl.D / 2 + 1; resetView(); box.classList.add('ready'); }
 
     function build(cfg, mdl) {
     var STRETCH = cfg.stretch, dir = cfg.dir + '/', group = mdl.group;
@@ -509,6 +555,74 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
         var py = Math.min(hImg.height - 1, Math.max(0, Math.round(v * hImg.height)));
         return (hd[(py * hImg.width + px) * 4] / 255 - 0.5) * DISP;
       };
+      if (cfg.flight) { // Kamera hängt einen Wegpunkt hinter ihrem Blickziel: sie schaut immer voraus, am Ende auf die Fahne
+        var P = function (p, hgt) { return new THREE.Vector3(X(p[0]), Y(p[0], p[1]) + hgt, Z(p[1])); }, HGT = [0.18, 0.5, 0.9, 1.0, 1.0, 0.9]; // Start in Golfer-Augenhöhe, dann aufsteigen
+        mdl.flight = { cam: cfg.flight.map(function (p, i) { return P(p, HGT[i]); }), tgt: cfg.flight.slice(1).map(function (p) { return P(p, 0); }).concat([P(d.flag, 0.3)]) };
+      }
+
+      if (cfg.mesh) return new Promise(function (ok) { var i = new Image(); i.onload = function () { ok(i); }; i.src = dir + 'ground.png'; }).then(meshModel);
+
+      // Branded: dieselbe Bahn als Navy-Linien auf Weiß (Höhengitter, Umriss, Drahtgitter-Bäume), ohne Licht und Farben
+      function meshModel(gImg) {
+        // Flächenart aus der Bodentextur: gemähte Flächen (Fairway, Grün, Abschläge) kräftig, Rough zart, Sand/Wege fast weiß
+        var gc = document.createElement('canvas'); gc.width = gImg.width; gc.height = gImg.height;
+        var gx = gc.getContext('2d'); gx.drawImage(gImg, 0, 0);
+        var gd = gx.getImageData(0, 0, gImg.width, gImg.height).data;
+        var ink = function (u, v) {
+          var o = (Math.min(gImg.height - 1, Math.round(v * gImg.height)) * gImg.width + Math.min(gImg.width - 1, Math.round(u * gImg.width))) * 4;
+          var r = gd[o] / 255, g = gd[o + 1] / 255, b = gd[o + 2] / 255, mx = Math.max(r, g, b), sat = mx ? (mx - Math.min(r, g, b)) / mx : 0;
+          return sat < 0.25 && mx > 0.35 ? 0.12 : mx >= 0.52 ? 0.9 : 0.28;
+        };
+        var white = new THREE.Color(0xffffff), navyC = new THREE.Color(0x0b1f4b), cols = [], tint = function (k) { var c = white.clone().lerp(navyC, k); cols.push(c.r, c.g, c.b); };
+        var NAVY = 0x0b1f4b, line = function (op) { return new THREE.LineBasicMaterial({ color: NAVY, transparent: true, opacity: op }); };
+        var poly = d.outline, inside = function (u, v) { // Punkt-in-Polygon (Umriss aus hole.json)
+          for (var i = 0, j = poly.length - 1, c = false; i < poly.length; j = i++)
+            if ((poly[i][1] > v) !== (poly[j][1] > v) && u < (poly[j][0] - poly[i][0]) * (v - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0]) c = !c;
+          return c;
+        };
+        // Gitter: Linien in beiden Richtungen, nur zwischen Punkten innerhalb des Umrisses, Höhe aus height.png
+        var NX = 110, NZ = Math.round(NX * D / W), pts = [], seg = function (u1, v1, u2, v2) {
+          if (!inside(u1, v1) || !inside(u2, v2)) return;
+          pts.push(X(u1), Y(u1, v1) + 0.005, Z(v1), X(u2), Y(u2, v2) + 0.005, Z(v2));
+          tint(ink(u1, v1)); tint(ink(u2, v2));
+        };
+        for (var iz = 0; iz <= NZ; iz++) for (var ix = 0; ix <= NX; ix++) {
+          var u = ix / NX, v = iz / NZ;
+          if (ix < NX) seg(u, v, (ix + 1) / NX, v);
+          if (iz < NZ) seg(u, v, u, (iz + 1) / NZ);
+        }
+        var grid = new THREE.BufferGeometry(); grid.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+        grid.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+        group.add(new THREE.LineSegments(grid, new THREE.LineBasicMaterial({ vertexColors: true })));
+        // Umriss kräftig: obere Kante auf Geländehöhe, untere Kante als Sockel
+        var top = [], bottom = [];
+        poly.forEach(function (p) { top.push(new THREE.Vector3(X(p[0]), Y(p[0], p[1]), Z(p[1]))); bottom.push(new THREE.Vector3(X(p[0]), -0.15, Z(p[1]))); });
+        group.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(top), line(1)));
+        group.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(bottom), line(0.4)));
+        // Untergrund: Umriss als Fläche in Navy 10 %, auf Sockelhöhe unter dem Gitter (schneidet so nirgends das Gelände)
+        var base = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(poly.map(function (p) { return new THREE.Vector2(X(p[0]), -Z(p[1])); }))),
+          new THREE.MeshBasicMaterial({ color: NAVY, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide }));
+        base.rotation.x = -Math.PI / 2; base.position.y = -0.15; group.add(base);
+        // Wasser als zarte Navy-Fläche
+        var wGeo = new THREE.PlaneGeometry(W, D); wGeo.rotateX(-Math.PI / 2);
+        var water = new THREE.Mesh(wGeo, new THREE.MeshBasicMaterial({ color: NAVY, alphaMap: load(dir + 'water.png'), transparent: true, opacity: 0.12, depthWrite: false }));
+        water.position.y = -0.04; group.add(water);
+        // Bäume als Drahtgitter-Kronen
+        var m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+        var crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshBasicMaterial({ color: NAVY, wireframe: true, transparent: true, opacity: 0.3 }), d.trees.length);
+        d.trees.forEach(function (t, i) {
+          var r = t[2] * W * 1.25, x = X(t[0]), z = Z(t[1]), y = Y(t[0], t[1]);
+          crowns.setMatrixAt(i, m4.compose(new THREE.Vector3(x, y + r * 1.7, z), q.setFromEuler(new THREE.Euler(0, i, 0)), new THREE.Vector3(r, r * 1.15, r)));
+        });
+        group.add(crowns);
+        // Fahne in Navy (weht wie in der 3D-Ansicht)
+        var fx = X(d.flag[0]), fz = Z(d.flag[1]), fy = Y(d.flag[0], d.flag[1]);
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(fx, fy, fz), new THREE.Vector3(fx, fy + 0.5, fz)]), line(1)));
+        var fGeo = new THREE.PlaneGeometry(0.16, 0.1, 10, 1); fGeo.translate(0.08, -0.05, 0);
+        var flag = new THREE.Mesh(fGeo, new THREE.MeshBasicMaterial({ color: NAVY, side: THREE.DoubleSide }));
+        flag.position.set(fx, fy + 0.5, fz); group.add(flag);
+        mdl.flag = flag; mdl.flagX = Float32Array.from(fGeo.attributes.position.array.filter(function (_, i) { return i % 3 === 0; }));
+      }
 
       // Gelände: fein unterteilte Fläche, Höhe per Displacement, Umriss per Alpha der Textur
       var gGeo = new THREE.PlaneGeometry(W, D, 300, Math.round(300 * D / W)); gGeo.rotateX(-Math.PI / 2);
@@ -570,8 +684,8 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
     // dadurch reagieren sie von selbst auf Drehung und Neigung der Kamera
     // (schmale Quader statt Linien: WebGL zeichnet Linien immer nur 1 px breit)
     var N = 450, LIFE = 2.5, wv = new THREE.Vector3(), streaks = [], flag, flagX, windSpeed = 0, HW = 7, HD = 9;
-    var sMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.03, 0.012, 1),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), N);
+    var sMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.018, 0.008, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false }), N);
     scene.add(sMesh);
     var sM = new THREE.Matrix4(), sP = new THREE.Vector3(), sQ = new THREE.Quaternion(), sS = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
     var spawn = function (st) { st.x = (Math.random() * 2 - 1) * HW; st.z = (Math.random() * 2 - 1) * HD; st.y = 0.25 + Math.random() * 1.2; st.age = 0; st.life = LIFE * (0.6 + Math.random() * 0.8); return st; };
@@ -616,7 +730,11 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
       if (canvas.width !== Math.round(w * renderer.getPixelRatio()) || canvas.height !== Math.round(h * renderer.getPixelRatio())) {
         renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
       }
-      controls.update();
+      if (queue.length) {
+        var a = queue[0], e = Math.min(1, (performance.now() - aStart) / (a.dur * 1000));
+        a.fn((a.ease || ease)(e)); camera.lookAt(controls.target);
+        if (e >= 1) { queue.shift(); aStart = performance.now(); if (!queue.length) { controls.enabled = true; controls.update(); busy(false); } }
+      } else controls.update();
       compass();
       renderer.render(scene, camera);
     })();
@@ -629,7 +747,7 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
       if (!look) return; // erster Frame läuft, bevor die Kompass-Variablen gesetzt sind
       camera.getWorldDirection(look);
       var hdg = Math.round((Math.atan2(look.x, -look.z) * 180 / Math.PI + NORTH + 360) % 360);
-      var tilt = Math.round(controls.getPolarAngle() * 180 / Math.PI);
+      var tilt = Math.round(Math.acos(Math.min(1, -look.y)) * 180 / Math.PI); // aus der Blickrichtung, stimmt auch beim Überflug
       if (hdg + '/' + tilt === last) return;
       last = hdg + '/' + tilt;
       dirEl.textContent = DIRS[Math.round(hdg / 45) % 8] + ' ' + hdg + '°';
@@ -638,7 +756,7 @@ console.assert(Math.abs(sunPos(new Date(Date.UTC(2026, 5, 21, 11, 20)), 53.9061,
       rose.setAttribute('transform', 'translate(12 12) scale(1 ' + Math.max(0.25, Math.cos(tilt * Math.PI / 180)).toFixed(3) + ') rotate(' + (-hdg) + ') translate(-12 -12)');
     }
   }
-  function check() { if (location.hash === '#3d') { init(); showModel(location.hash); } }
+  function check() { if (location.hash === '#3d' || location.hash === '#brand') { init(); showModel(location.hash); } }
   addEventListener('hashchange', check);
   check();
 })();
