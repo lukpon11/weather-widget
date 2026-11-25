@@ -36,7 +36,13 @@
   #weather-widget .ww-odo { white-space: pre; }
   #weather-widget .ww-odo > span { display: inline-block; vertical-align: top; height: 1.15em; line-height: 1.15em; overflow: hidden; }
   #weather-widget .ww-d > span { display: block; transition: transform .9s cubic-bezier(.2,.7,.2,1); }
-  @media (prefers-reduced-motion: reduce) { #weather-widget .ww-d > span { transition: none; } }
+  /* Intro: Icon, Hauptwert, Subline gleiten nacheinander hoch; rechte Spalte leicht versetzt */
+  @keyframes ww-up { from { opacity: 0; transform: translateY(16px); } }
+  #weather-widget .ww-col > * { animation: ww-up .6s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--ww-c, 0s); }
+  #weather-widget .ww-col:nth-child(2) { --ww-c: .2s; }
+  #weather-widget .ww-col > :nth-child(2) { animation-delay: calc(var(--ww-c, 0s) + .12s); }
+  #weather-widget .ww-col > :nth-child(3) { animation-delay: calc(var(--ww-c, 0s) + .24s); }
+  @media (prefers-reduced-motion: reduce) { #weather-widget .ww-d > span { transition: none; } #weather-widget .ww-col > * { animation: none; } }
 </style>
 <script>
 (function () {
