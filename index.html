@@ -61,7 +61,7 @@
   fetch(URL).then(function (r) { return r.json(); }).then(function (d) {
     var c = d.current, w = weather(c.weather_code, c.is_day);
     $('ww-weather-icon').innerHTML = ICONS[w[0]];
-    $('ww-temp').textContent = fmt(c.temperature_2m) + ' °C';
+    $('ww-temp').textContent = (Math.round(c.temperature_2m) || 0) + ' °C'; // || 0 vermeidet "-0";
     $('ww-desc').textContent = w[1];
     $('ww-wind').textContent = fmt(c.wind_speed_10m) + ' m/s';
     $('ww-dir').textContent = 'aus ' + DIRS[Math.round(c.wind_direction_10m / 45) % 8];
