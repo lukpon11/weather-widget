@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weather Widget</title>
+<!-- nur Demo-Seite, gehört nicht ins Webflow-Embed -->
+<style>body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fff; }</style>
+</head>
+<body>
+<!-- Webflow: alles zwischen START und END in ein Embed-Element kopieren -->
+<!-- START weather-widget -->
+<div id="weather-widget" aria-live="polite">
+  <div class="ww-col">
+    <svg class="ww-icon" id="ww-weather-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
+    <div class="ww-value" id="ww-temp">–</div>
+    <div class="ww-label" id="ww-desc">Wetter</div>
+  </div>
+  <div class="ww-col">
+    <svg class="ww-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/></svg>
+    <div class="ww-value" id="ww-wind">–</div>
+    <div class="ww-label" id="ww-dir">Wind</div>
+  </div>
+</div>
+<style>
+  #weather-widget { --ww-navy: #0b1f4b; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 360px; padding: 24px; background: #fff; color: var(--ww-navy); border-radius: 16px; box-shadow: 0 2px 12px rgba(11,31,75,.12); font-family: system-ui, sans-serif; text-align: center; }
+  #weather-widget .ww-icon { width: 56px; height: 56px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  #weather-widget .ww-value { font-size: 28px; font-weight: 600; margin-top: 8px; }
+  #weather-widget .ww-label { font-size: 14px; }
+</style>
+<script>
+(function () {
+  // Schloss Breitenburg (OSM); Daten: Open-Meteo, kein API-Key nötig
+  var URL = 'https://api.open-meteo.com/v1/forecast?latitude=53.9061&longitude=9.5667&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Europe%2FBerlin';
+  var cloud = '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11.1 3.5 3.5 0 0 0 7 18z"/>';
+  var cloudUp = '<path d="M7 15h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 8.1 3.5 3.5 0 0 0 7 15z"/>';
+  var ICONS = {
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    partly: '<path d="M8 2v1.5M3.5 4.5l1 1M2 9h1.5M12.5 4.5l-1 1M5.3 11.5A3.5 3.5 0 0 1 11 6"/>' + cloud,
+    cloud: cloud,
+    fog: '<path d="M4 9h16M3 13h18M5 17h14"/>',
+    rain: cloudUp + '<path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>',
+    snow: cloudUp + '<path d="M8 19h.01M12 21h.01M16 19h.01M10 21h.01M14 19h.01"/>',
+    thunder: cloudUp + '<path d="M13 15l-2 4h3l-2 4"/>'
+  };
+  // WMO-Wettercodes -> [Icon, Text]
+  function weather(code, isDay) {
+    if (code <= 1) return [isDay ? 'sun' : 'moon', 'Klar'];
+    if (code === 2) return ['partly', 'Teils bewölkt'];
+    if (code === 3) return ['cloud', 'Bewölkt'];
+    if (code <= 48) return ['fog', 'Nebel'];
+    if (code <= 67 || (code >= 80 && code <= 82)) return ['rain', 'Regen'];
+    if (code <= 86) return ['snow', 'Schnee'];
+    return ['thunder', 'Gewitter'];
+  }
+  var DIRS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (n) { return n.toLocaleString('de-DE', { maximumFractionDigits: 1 }); };
+
+  fetch(URL).then(function (r) { return r.json(); }).then(function (d) {
+    var c = d.current, w = weather(c.weather_code, c.is_day);
+    $('ww-weather-icon').innerHTML = ICONS[w[0]];
+    $('ww-temp').textContent = fmt(c.temperature_2m) + ' °C';
+    $('ww-desc').textContent = w[1];
+    $('ww-wind').textContent = fmt(c.wind_speed_10m) + ' m/s';
+    $('ww-dir').textContent = 'aus ' + DIRS[Math.round(c.wind_direction_10m / 45) % 8];
+  }).catch(function () { $('ww-desc').textContent = 'Keine Daten'; });
+})();
+</script>
+<!-- END weather-widget -->
+</body>
+</html>
