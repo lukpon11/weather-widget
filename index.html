@@ -10,29 +10,28 @@
 <body>
 <!-- Webflow: alles zwischen START und END in ein Embed-Element kopieren -->
 <!-- START weather-widget -->
-<div id="weather-widget" aria-live="polite">
-  <div class="ww-col">
-    <svg class="ww-icon" id="ww-weather-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
-    <div class="ww-value" id="ww-temp" role="img" aria-label="Temperatur">–</div>
-    <div class="ww-label" id="ww-desc">Wetter</div>
-    <div class="ww-station">Itzehoe <span id="ww-st-temp" role="img">–</span></div>
-  </div>
-  <div class="ww-col">
-    <svg class="ww-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/></svg>
-    <div class="ww-value" id="ww-wind" role="img" aria-label="Wind">–</div>
-    <div class="ww-label" id="ww-dir">Wind</div>
-    <div class="ww-station">Itzehoe <span id="ww-st-wind" role="img">–</span></div>
+<div id="weather-widget">
+  <div class="ww-card" aria-live="polite">
+    <div class="ww-col">
+      <svg class="ww-icon" id="ww-weather-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
+      <div class="ww-value" id="ww-temp" role="img" aria-label="Temperatur">–</div>
+      <div class="ww-label" id="ww-desc">Wetter</div>
+    </div>
+    <div class="ww-col">
+      <svg class="ww-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/></svg>
+      <div class="ww-value" id="ww-wind" role="img" aria-label="Wind">–</div>
+      <div class="ww-label" id="ww-dir">Wind</div>
+    </div>
   </div>
   <div class="ww-foot" id="ww-foot">Modell: Schloss Breitenburg · Messung: DWD Itzehoe</div>
 </div>
 <style>
-  #weather-widget { --ww-navy: #0b1f4b; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 420px; padding: 40px; background: #fff; color: var(--ww-navy); border-radius: 16px; box-shadow: 0 2px 12px rgba(11,31,75,.12); font-family: system-ui, sans-serif; text-align: center; font-variant-numeric: tabular-nums; }
+  #weather-widget { --ww-navy: #0b1f4b; max-width: 420px; color: var(--ww-navy); font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  #weather-widget .ww-card { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; padding: 40px; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(11,31,75,.12); text-align: center; }
   #weather-widget .ww-icon { width: 80px; height: 80px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   #weather-widget .ww-value { font-size: 28px; font-weight: 800; margin-top: 8px; }
-  #weather-widget .ww-station span { font-weight: 700; }
   #weather-widget .ww-label { font-size: 14px; }
-  #weather-widget .ww-station { font-size: 13px; margin-top: 8px; opacity: .75; }
-  #weather-widget .ww-foot { grid-column: 1 / -1; font-size: 11px; opacity: .6; }
+  #weather-widget .ww-foot { margin-top: 8px; font-size: 11px; opacity: .6; text-align: right; }
   /* Odometer: jede Ziffer ist ein senkrechter 0–9-Streifen, der per translateY rollt */
   #weather-widget .ww-odo { white-space: pre; }
   #weather-widget .ww-odo > span { display: inline-block; vertical-align: top; height: 1.15em; line-height: 1.15em; overflow: hidden; }
@@ -70,9 +69,22 @@
   }
   var DIRS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
   var $ = function (id) { return document.getElementById(id); };
-  var deg = function (t) { return t == null ? '–' : (Math.round(t) || 0) + ' °C'; }; // || 0 vermeidet "-0"
-  var ms = function (v) { return v == null ? '–' : v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m/s'; };
-  var dir = function (d) { return d == null ? '' : DIRS[Math.round(d / 45) % 8]; };
+
+  // Mittel aus beiden Quellen; fehlt eine, zählt nur die andere
+  function avg(vals) {
+    vals = vals.filter(function (v) { return v != null; });
+    return vals.length ? vals.reduce(function (s, v) { return s + v; }, 0) / vals.length : null;
+  }
+  // Richtungen als Einheitsvektoren mitteln, sonst ergäbe 350° + 10° fälschlich 180°
+  // shortcut: bei genau entgegengesetzten Richtungen ist das Ergebnis zufällig; bei 2 Quellen in der Praxis egal
+  function avgDir(vals) {
+    vals = vals.filter(function (v) { return v != null; });
+    if (!vals.length) return null;
+    var x = 0, y = 0;
+    vals.forEach(function (d) { x += Math.cos(d * Math.PI / 180); y += Math.sin(d * Math.PI / 180); });
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  console.assert(Math.round(avgDir([350, 10])) % 360 === 0 && avgDir([90, 180]) === 135 && avg([1, null]) === 1, 'weather-widget: Mittelwert fehlerhaft');
 
   // Odometer: Ziffern rollen, andere Zeichen werden direkt gesetzt
   var STRIP = '<span>' + '0123456789'.split('').join('<br>') + '</span>';
@@ -100,24 +112,31 @@
     }
   }
 
-  function load() {
-    fetch(MODEL_URL).then(function (r) { return r.json(); }).then(function (d) {
-      var c = d.current, w = weather(c.weather_code, c.is_day);
-      $('ww-weather-icon').innerHTML = ICONS[w[0]];
-      odo($('ww-temp'), deg(c.temperature_2m));
-      $('ww-desc').textContent = w[1];
-      odo($('ww-wind'), ms(c.wind_speed_10m));
-      $('ww-dir').textContent = 'aus ' + dir(c.wind_direction_10m);
-    }).catch(function () { $('ww-desc').textContent = 'Keine Daten'; });
+  var getJson = function (url) {
+    return fetch(url).then(function (r) { return r.json(); }).catch(function () { return null; });
+  };
 
-    fetch(STATION_URL).then(function (r) { return r.json(); }).then(function (d) {
-      var w = d.weather;
-      odo($('ww-st-temp'), deg(w.temperature));
-      // Bright Sky liefert km/h
-      odo($('ww-st-wind'), ms(w.wind_speed_10 == null ? null : w.wind_speed_10 / 3.6) + ' ' + dir(w.wind_direction_10));
-      $('ww-foot').textContent = 'Modell: Schloss Breitenburg · Messung: DWD Itzehoe, ' +
-        new Date(w.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
-    }).catch(function () { $('ww-st-temp').textContent = $('ww-st-wind').textContent = '–'; });
+  function load() {
+    Promise.all([getJson(MODEL_URL), getJson(STATION_URL)]).then(function (res) {
+      var m = res[0] && res[0].current, s = res[1] && res[1].weather;
+      if (!m && !s) { $('ww-desc').textContent = 'Keine Daten'; return; }
+      m = m || {}; s = s || {};
+
+      var temp = avg([m.temperature_2m, s.temperature]);
+      var speed = avg([m.wind_speed_10m, s.wind_speed_10 == null ? null : s.wind_speed_10 / 3.6]); // Bright Sky liefert km/h
+      var dir = avgDir([m.wind_direction_10m, s.wind_direction_10]);
+
+      if (m.weather_code != null) {
+        var w = weather(m.weather_code, m.is_day);
+        $('ww-weather-icon').innerHTML = ICONS[w[0]];
+        $('ww-desc').textContent = w[1];
+      }
+      odo($('ww-temp'), temp == null ? '–' : (Math.round(temp) || 0) + ' °C'); // || 0 vermeidet "-0"
+      odo($('ww-wind'), speed == null ? '–' : speed.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m/s');
+      $('ww-dir').textContent = dir == null ? 'Wind' : 'aus ' + DIRS[Math.round(dir / 45) % 8];
+      $('ww-foot').textContent = 'Modell: Schloss Breitenburg · Messung: DWD Itzehoe' + (s.timestamp
+        ? ', ' + new Date(s.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr' : '');
+    });
   }
 
   load();
